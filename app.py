@@ -477,6 +477,10 @@ def agent_view(agent_name):
         "sentinel": "Monitor ethical guidelines and approve actions"
     }
     
+    # Initialize variables to avoid UnboundLocalError
+    plans = None
+    research_projects = None
+    
     # Get agent-specific information
     if agent_name == "planner":
         # Get all plans for the planner
@@ -490,9 +494,6 @@ def agent_view(agent_name):
             research_projects = researcher_agent.list_research_projects()
         except:
             research_projects = "No research projects available"
-    else:
-        plans = None
-        research_projects = None
     
     # Get recent outputs from this agent
     recent_output = memory.recall_agent_output(agent_name)
