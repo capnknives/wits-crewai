@@ -315,11 +315,19 @@ def submit_task():
     if not command:
         return jsonify({"status": "error", "message": "Command cannot be empty"}), 400
     
+    # Clean the command - remove any "er," prefix that might be getting added
+    if command.startswith("er,"):
+        command = command[3:].strip()
+        print(f"[WEB] Removed 'er,' prefix from command: {command}")
+    
     # Use the router to determine which agent should handle this
     agent_name, task_content = route_task(command, fallback_agent=config["router"].get("fallback_agent", "analyst"))
     
     # Generate a task ID
     task_id = f"task_{int(time.time())}_{agent_name}"
+    
+    # Log the routing decision
+    print(f"[WEB] Routed command '{command}' to agent '{agent_name}' with task content: '{task_content}'")
     
     # Add to the task queue
     task_queue.put((task_id, agent_name, task_content))

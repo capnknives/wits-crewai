@@ -12,7 +12,10 @@
 #         config = yaml.safe_load(f)
 # FALLBACK_AGENT = config.get("router", {}).get("fallback_agent", "analyst")
 
-def route_task(user_input, fallback_agent="analyst"): # Added fallback_agent parameter
+# core/router.py
+# Routes a given user command to the most relevant agent
+
+def route_task(user_input, fallback_agent="analyst"):
     """
     Routes a given user command to the most relevant agent.
     Args:
@@ -21,8 +24,12 @@ def route_task(user_input, fallback_agent="analyst"): # Added fallback_agent par
     Returns:
         tuple: (agent_name_key, task_content)
     """
+    # Clean up the input - remove any unwanted prefixes
+    if user_input.startswith("er,"):
+        user_input = user_input[3:].strip()
+    
     text_lower = user_input.lower()
-    task_content = user_input # Default task content is the full input
+    task_content = user_input  # Default task content is the full input
 
     # Agent-specific parsing (stripping agent name from task)
     if text_lower.startswith("scribe"):
@@ -34,27 +41,45 @@ def route_task(user_input, fallback_agent="analyst"): # Added fallback_agent par
     elif text_lower.startswith("engineer"):
         agent_name = "engineer"
         task_content = user_input[len("engineer"):].lstrip(" :,")
+    elif text_lower.startswith("researcher"):
+        agent_name = "researcher"
+        task_content = user_input[len("researcher"):].lstrip(" :,")
     elif text_lower.startswith("quartermaster"):
         agent_name = "quartermaster"
         # Quartermaster typically handles its own sub-command parsing from the content
         task_content = user_input[len("quartermaster"):].lstrip(" :,")
         # If content is empty, it implies a general query to Quartermaster
         if not task_content and user_input.lower() == "quartermaster":
-            task_content = "help" # or some default general status query
+            task_content = "help"  # or some default general status query
     elif text_lower.startswith("sentinel"):
         agent_name = "sentinel"
         task_content = user_input[len("sentinel"):].lstrip(" :,")
+    elif text_lower.startswith("planner"):
+        agent_name = "planner"
+        task_content = user_input[len("planner"):].lstrip(" :,")
     else:
         # Fallback keyword-based inference (if no explicit agent prefix)
         agent_name = None
-        if any(kw in text_lower for kw in ["write", "draft", "chapter", "book", "poem", "article"]):
+        
+        # Research-specific keywords (should check these before analyst keywords)
+        if any(kw in text_lower for kw in ["research on", "build a report", "compile a report", "investigate", "research project"]):
+            agent_name = "researcher"
+        # Writing-specific keywords
+        elif any(kw in text_lower for kw in ["write", "draft", "chapter", "book", "poem", "article"]):
             agent_name = "scribe"
+        # Analysis-specific keywords
         elif any(kw in text_lower for kw in ["analyze", "summary", "research", "report", "find", "what is", "explain"]):
             agent_name = "analyst"
+        # Engineering-specific keywords
         elif any(kw in text_lower for kw in ["code", "fix", "script", "generate code", "develop", "debug", "function"]):
             agent_name = "engineer"
+        # Planning-specific keywords
+        elif any(kw in text_lower for kw in ["plan", "strategy", "break down", "organize", "schedule"]):
+            agent_name = "planner"
+        # File and goal management keywords
         elif any(kw in text_lower for kw in ["goal", "file", "inventory", "save", "list", "read", "delete", "add goal", "complete goal"]):
             agent_name = "quartermaster"
+        # Ethics and guideline keywords
         elif any(kw in text_lower for kw in ["ethic", "rule", "audit", "violation", "guideline", "policy"]):
             agent_name = "sentinel"
 
