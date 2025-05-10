@@ -106,14 +106,21 @@ def main():
         )
         return
 
-    # Initialize memory system (prefer enhanced memory if available)
+    # Initialize memory system (prefer vector memory first, then enhanced memory, then basic memory)
+try:
+    from core.vector_memory import VectorMemory
+    memory = VectorMemory(memory_file='vector_memory.json', index_file='vector_index.bin')
+    print("[SYSTEM] Using Vector Memory system")
+except Exception as e:
+    print(f"[SYSTEM] Vector Memory not available, falling back to Enhanced Memory: {e}")
     try:
+        from core.enhanced_memory import EnhancedMemory
         memory = EnhancedMemory(memory_file='enhanced_memory.json')
         print("[SYSTEM] Using Enhanced Memory system")
-    except Exception as e:
-        print(f"[SYSTEM] Enhanced Memory not available, falling back to basic Memory: {e}")
+    except Exception as e2:
+        print(f"[SYSTEM] Enhanced Memory not available, falling back to basic Memory: {e2}")
+        from core.memory import Memory
         memory = Memory()
-
     # Initialize message bus
     message_bus = MessageBus(save_path='message_history.json')
 
