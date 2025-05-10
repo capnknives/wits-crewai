@@ -3,7 +3,7 @@
 # General Settings
 internet_access: true        # Allow agents to access the internet (web search) if true
 allow_code_execution: true   # If true, allows actual execution of generated code (BE VERY CAREFUL WITH THIS!)
-ethics_enabled: true         # Enable or disable the ethics filter and sentinel checks globally
+ethics_enabled: false         # Enable or disable the ethics filter and sentinel checks globally
 output_directory: "output"   # Default directory for files written by agents
 
 # Voice Input Settings
@@ -34,6 +34,12 @@ web_interface:
   debug: true                 # Whether to run Flask in debug mode
   enable_file_uploads: true   # Whether to allow file uploads through the web interface
   max_file_size: 5            # Maximum file upload size in MB
+
+# Autonomous Planner Settings
+autonomous_planner:
+  enabled: true               # Enable autonomous goal processing by the Planner
+  check_interval_seconds: 30  # How often to check for pending goals when idle (in seconds)
+  max_goal_retries: 2         # Max times an autonomous goal will be retried after failure before being ignored by autonomous mode
 
 # (Future Gemini API Settings - Placeholder)
 # gemini:

@@ -5,9 +5,7 @@
 {% block page_title %}WITS CrewAI Dashboard{% endblock %}
 
 {% block content %}
-<!-- Page content -->
 <div class="row">
-    <!-- Command Input Card -->
     <div class="col-12">
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
@@ -16,8 +14,8 @@
             <div class="card-body">
                 <form id="command-form">
                     <div class="input-group">
-                        <input type="text" class="form-control bg-light border-0 small command-input" 
-                            placeholder="Enter a command (e.g., 'Analyst, search for recent AI news')" 
+                        <input type="text" class="form-control bg-light border-0 small command-input"
+                            placeholder="Enter a command (e.g., 'Analyst, search for recent AI news')"
                             id="command-input" aria-label="Command" aria-describedby="basic-addon2">
                         <div class="input-group-append">
                             <button class="btn btn-primary" type="submit">
@@ -26,24 +24,33 @@
                         </div>
                     </div>
                 </form>
-                
-                <!-- Loading indicator -->
+
                 <div id="loading-indicator" class="loading-indicator mt-3">
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
                     <p class="mt-2">Processing your request...</p>
                 </div>
-                
-                <!-- Result container -->
+
                 <div id="result-container" class="result-container">
                     <p class="text-muted">Your results will appear here</p>
                 </div>
+
+                <div id="planner-status-container" class="mt-3" style="display: none;">
+                    <div class="card border-left-info shadow-sm">
+                        <div class="card-body">
+                            <h6 class="m-0 font-weight-bold text-info">Planner Status:</h6>
+                            <div id="planner-status-content" class="text-muted small mt-2" style="white-space: pre-wrap; max-height: 150px; overflow-y: auto;">
+                                Waiting for planner activity...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
-    
-    <!-- Agents Grid -->
+
     <div class="col-12">
         <div class="card shadow mb-4">
             <div class="card-header py-3">
@@ -89,10 +96,8 @@
             </div>
         </div>
     </div>
-    
-    <!-- Quick Access Row -->
+
     <div class="col-lg-6">
-        <!-- Goals Card -->
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                 <h6 class="m-0 font-weight-bold text-primary">Current Goals</h6>
@@ -126,9 +131,8 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-lg-6">
-        <!-- Recent Files Card -->
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                 <h6 class="m-0 font-weight-bold text-primary">Recent Files</h6>
@@ -166,19 +170,77 @@
 {% block extra_js %}
 <script>
     $(document).ready(function() {
+        let plannerStatusInterval;
+
+        // Function to fetch and display planner status
+        function fetchPlannerStatus() {
+            $.ajax({
+                url: '/api/planner_status',
+                type: 'GET',
+                success: function(response) {
+                    if (response.status === 'success' && response.planner_status) {
+                        $('#planner-status-content').text(response.planner_status);
+                        $('#planner-status-container').show(); // Show if not already visible
+                    } else if (response.status === 'success' && !response.planner_status) {
+                         $('#planner-status-content').text('Planner is idle or no status reported.');
+                         $('#planner-status-container').show();
+                    }
+                    // If error, we can choose to hide it or show an error message
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error fetching planner status:', error);
+                    // $('#planner-status-content').text('Error fetching planner status.');
+                    // Optionally hide the container on error or after a few failed attempts
+                }
+            });
+        }
+
         // Handle command form submission
         $('#command-form').on('submit', function(e) {
             e.preventDefault();
-            
+
             const command = $('#command-input').val().trim();
             if (!command) return;
-            
-            // Submit the command
-            submitCommand(command);
-            
+
+            // Submit the command (using the global submitCommand from base.html)
+            submitCommand(command, function(success, resultData) {
+                // This callback in submitCommand (from base.html) handles showing the main result.
+                // We specifically handle planner status polling here.
+
+                if (command.toLowerCase().includes("planner") &&
+                    (command.toLowerCase().includes("execute plan") || command.toLowerCase().includes("create and execute plan"))) {
+                    // Start or ensure polling is active for planner status
+                    $('#planner-status-content').text('Planner initiated. Waiting for status updates...');
+                    $('#planner-status-container').show();
+                    if (plannerStatusInterval) clearInterval(plannerStatusInterval); // Clear existing interval
+                    plannerStatusInterval = setInterval(fetchPlannerStatus, 3000); // Poll every 3 seconds
+
+                    // Heuristic to stop polling: if the main task completes,
+                    // assume planner's detailed logging also stops.
+                    // The submitCommand's checkTaskStatus will eventually call this callback.
+                    // This is a simplified stop condition.
+                    // A more robust way would be if planner signals its final completion status.
+                }
+            });
+
             // Clear the input
             $('#command-input').val('');
         });
+
+        // Initial fetch in case a plan is already running from a previous interaction on another page or CLI.
+        // Or if you want the status to be always visible.
+        // fetchPlannerStatus(); // Uncomment if you want to fetch on page load.
+        // plannerStatusInterval = setInterval(fetchPlannerStatus, 5000); // And poll continuously.
+
+        // Override or enhance the global checkTaskStatus if needed to stop polling
+        // This is a bit more involved as it requires modifying the global function
+        // or adding more specific logic here.
+        // For now, the polling might continue if not explicitly stopped.
+        // A simple way to stop it is if the main result indicates completion of a planner task.
+        // Let's assume for now that the user will navigate away or the natural end of interaction
+        // makes continuous polling less of an issue. A more robust solution could be:
+        // In submitCommand's callback, if the task is completed/error/blocked, AND the command
+        // was a planner execution command, then clearInterval(plannerStatusInterval).
     });
 </script>
 {% endblock %}

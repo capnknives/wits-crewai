@@ -5,9 +5,7 @@
 {% block page_title %}Goals{% endblock %}
 
 {% block content %}
-<!-- Page content -->
 <div class="row">
-    <!-- Add Goal Card -->
     <div class="col-12">
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
@@ -15,23 +13,24 @@
             </div>
             <div class="card-body">
                 <form id="add-goal-form">
-                    <div class="row">
-                        <div class="col-md-8">
+                    <div class="row align-items-end">
+                        <div class="col-md-7 mb-2 mb-md-0">
+                            <label for="goal-description" class="form-label">Goal Description</label>
                             <input type="text" class="form-control" id="goal-description" placeholder="Enter goal description">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-3 mb-2 mb-md-0">
+                            <label for="goal-agent" class="form-label">Suggested Agent</label>
                             <select class="form-select" id="goal-agent">
-                                <option value="">No specific agent</option>
+                                <option value="">Any/Unassigned</option>
                                 <option value="Analyst">Analyst</option>
                                 <option value="Engineer">Engineer</option>
                                 <option value="Scribe">Scribe</option>
                                 <option value="Researcher">Researcher</option>
                                 <option value="Planner">Planner</option>
-                                <option value="Quartermaster">Quartermaster</option>
-                            </select>
+                                </select>
                         </div>
-                        <div class="col-md-1">
-                            <button type="submit" class="btn btn-primary w-100">Add</button>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">Add Goal</button>
                         </div>
                     </div>
                 </form>
@@ -40,12 +39,11 @@
         </div>
     </div>
     
-    <!-- Current Goals Card -->
     <div class="col-lg-6">
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                 <h6 class="m-0 font-weight-bold text-primary">Current Goals</h6>
-                <button class="btn btn-sm btn-primary" id="refresh-goals-btn">
+                <button class="btn btn-sm btn-primary" id="refresh-goals-btn" onclick="window.location.reload()">
                     <i class="fas fa-sync-alt"></i> Refresh
                 </button>
             </div>
@@ -54,12 +52,18 @@
                 <div class="list-group">
                     {% for goal in goals %}
                     <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>{{ goal }}</div>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-success complete-goal-btn" data-goal="{{ goal }}">
-                                <i class="fas fa-check"></i> Complete
-                            </button>
-                        </div>
+                        <div>{{ goal.display_text }}</div>
+                        {% if goal.id %}
+                        <button class="btn btn-sm btn-success complete-goal-btn" 
+                                data-goal-id="{{ goal.id }}" 
+                                data-goal-text="{{ goal.task_description | e }}">
+                            <i class="fas fa-check"></i> Complete
+                        </button>
+                        {% else %}
+                        <button class="btn btn-sm btn-secondary" disabled title="Goal ID missing, cannot complete via UI">
+                            <i class="fas fa-check"></i> Complete
+                        </button>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -73,7 +77,6 @@
         </div>
     </div>
     
-    <!-- Completed Goals Card -->
     <div class="col-lg-6">
         <div class="card shadow mb-4">
             <div class="card-header py-3">
@@ -82,9 +85,10 @@
             <div class="card-body">
                 {% if completed %}
                 <div class="list-group">
-                    {% for goal in completed %}
+                    {% for goal_item in completed %} {# Assuming completed is a list of dicts/strings #}
                     <div class="list-group-item">
-                        <i class="fas fa-check-circle text-success me-2"></i> {{ goal }}
+                        <i class="fas fa-check-circle text-success me-2"></i> 
+                        {{ goal_item.display_text if goal_item.display_text else goal_item }}
                     </div>
                     {% endfor %}
                 </div>
@@ -98,53 +102,25 @@
         </div>
     </div>
     
-    <!-- Goal Commands Card -->
     <div class="col-12">
         <div class="card shadow mb-4">
             <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Goal Commands</h6>
+                <h6 class="m-0 font-weight-bold text-primary">Goal Commands (via CLI or Main Command Center)</h6>
             </div>
             <div class="card-body">
-                <p>Here are some example commands you can use to manage goals:</p>
+                <p>Use these commands in the main command input or CLI:</p>
                 <ul>
-                    <li><code>Quartermaster, add goal Research AI ethics</code> - Add a new goal</li>
-                    <li><code>Quartermaster, add goal Create Python script for data analysis for Engineer</code> - Add a goal for a specific agent</li>
-                    <li><code>Quartermaster, list goals</code> - List all current goals</li>
-                    <li><code>Quartermaster, complete goal 2</code> - Mark a goal as completed by its number</li>
-                    <li><code>Quartermaster, complete goal research</code> - Mark a goal as completed by matching text</li>
+                    <li><code>Quartermaster, add goal Research AI ethics</code></li>
+                    <li><code>Quartermaster, add goal Create Python script for data analysis for Engineer</code></li>
+                    <li><code>Quartermaster, list goals</code></li>
+                    <li><code>Quartermaster, complete goal by id [GOAL_ID_PREFIX]</code> (e.g., `complete goal by id 55b56ae8`)</li>
+                    <li><code>Quartermaster, complete goal research</code> (less reliable, matches text)</li>
                 </ul>
-                
-                <form id="goal-command-form">
-                    <div class="input-group mt-3">
-                        <input type="text" class="form-control bg-light border-0 small command-input" 
-                            placeholder="Enter a goal command (e.g., 'Quartermaster, list goals')" 
-                            id="goal-command-input" aria-label="Command" aria-describedby="basic-addon2">
-                        <div class="input-group-append">
-                            <button class="btn btn-primary" type="submit">
-                                <i class="fas fa-paper-plane fa-sm"></i> Send
-                            </button>
-                        </div>
-                    </div>
-                </form>
-                
-                <!-- Loading indicator -->
-                <div id="loading-indicator" class="loading-indicator mt-3">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Processing your request...</p>
                 </div>
-                
-                <!-- Result container -->
-                <div id="result-container" class="result-container">
-                    <p class="text-muted">Your results will appear here</p>
-                </div>
-            </div>
         </div>
     </div>
 </div>
 
-<!-- Complete Goal Modal -->
 <div class="modal fade" id="completeGoalModal" tabindex="-1" aria-labelledby="completeGoalModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -154,16 +130,19 @@
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to mark this goal as completed?</p>
-                <p><strong>Goal: </strong><span id="complete-goal-text"></span></p>
+                <p><strong>Goal Task: </strong><span id="modal-goal-text-display"></span></p>
+                <p><small><strong>Goal ID: </strong><span id="modal-goal-id-display"></span></small></p>
                 
+                <input type="hidden" id="modal-goal-id-input">
+
                 <div class="mb-3">
-                    <label for="goal-result" class="form-label">Result (optional)</label>
-                    <textarea class="form-control" id="goal-result" rows="3" placeholder="Enter any results or notes"></textarea>
+                    <label for="goal-result" class="form-label">Result/Notes (optional)</label>
+                    <textarea class="form-control" id="goal-result" rows="3" placeholder="Enter any results or notes for completing this goal"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="confirm-complete-btn">Complete</button>
+                <button type="button" class="btn btn-success" id="confirm-complete-btn">Confirm Completion</button>
             </div>
         </div>
     </div>
@@ -182,23 +161,26 @@
                 $('#add-goal-status').html('<div class="alert alert-warning">Please enter a goal description.</div>');
                 return;
             }
-            
             const agent = $('#goal-agent').val();
             
+            // Use the global submitCommand from base.html or a direct API call
+            // For adding goals, it's often better to have a dedicated API endpoint
+            // that directly calls memory.add_goal for reliability.
+            // Assuming /api/goals POST endpoint exists in app.py
             $.ajax({
-                url: '/api/goals',
+                url: '/api/goals', // Make sure this endpoint exists and calls memory.add_goal
                 type: 'POST',
+                contentType: 'application/json',
                 data: JSON.stringify({ 
                     task: description,
-                    agent: agent 
+                    agent: agent || null // Send null if no agent selected
                 }),
                 success: function(response) {
                     if (response.status === 'success') {
-                        $('#add-goal-status').html('<div class="alert alert-success">Goal added successfully!</div>');
-                        // Refresh the page after successful addition
-                        window.location.reload();
+                        $('#add-goal-status').html('<div class="alert alert-success">Goal added successfully! Refreshing...</div>');
+                        setTimeout(function() { window.location.reload(); }, 1500);
                     } else {
-                        $('#add-goal-status').html('<div class="alert alert-danger">Error: ' + response.message + '</div>');
+                        $('#add-goal-status').html('<div class="alert alert-danger">Error: ' + (response.message || 'Could not add goal.') + '</div>');
                     }
                 },
                 error: function(xhr, status, error) {
@@ -207,55 +189,84 @@
             });
         });
         
-        // Handle complete goal button click
+        // Handle complete goal button click - Show modal
         $('.complete-goal-btn').on('click', function() {
-            const goal = $(this).data('goal');
-            $('#complete-goal-text').text(goal);
+            const goalId = $(this).data('goal-id');
+            const goalText = $(this).data('goal-text'); 
+            
+            $('#modal-goal-id-input').val(goalId); // Store ID in hidden input
+            $('#modal-goal-id-display').text(goalId);
+            $('#modal-goal-text-display').text(goalText); // Show task description
+            $('#goal-result').val(''); // Clear previous result
+            
             $('#completeGoalModal').modal('show');
         });
         
-        // Handle complete confirmation
+        // Handle actual completion from modal
         $('#confirm-complete-btn').on('click', function() {
-            const goal = $('#complete-goal-text').text();
-            const result = $('#goal-result').val().trim();
+            const goalIdToComplete = $('#modal-goal-id-input').val();
+            const resultNotes = $('#goal-result').val().trim();
             
-            // Hide modal
+            if (!goalIdToComplete) {
+                alert("Error: Goal ID is missing. Cannot complete.");
+                return;
+            }
+            
             $('#completeGoalModal').modal('hide');
             
-            // Send command to complete goal
-            let command = 'Quartermaster, complete goal ' + goal;
-            submitCommand(command, function(success, commandResult) {
+            // Construct command for Quartermaster to complete by ID
+            let command = 'Quartermaster, complete goal by id ' + goalIdToComplete;
+            if (resultNotes) {
+                // How to pass result notes? Quartermaster's complete goal command might need adjustment
+                // For now, we'll just send the command. The result can be added manually or enhance QM.
+                // A better way: a dedicated API endpoint for completing goals with results.
+                // command += ' with result: ' + resultNotes; // This might not be parsed by QM
+                console.log("Result notes for goal " + goalIdToComplete + ": " + resultNotes); 
+                // For now, the result notes are not directly passed in the command to QM.
+                // This would require enhancing Quartermaster's command parsing for "complete goal by id ... with result ..."
+                // OR a direct API call to memory.complete_goal(goalId, resultNotes) if an endpoint exists.
+            }
+
+            // Use the global submitCommand (from base.html)
+            // This function should show loading indicators and handle results.
+            submitCommand(command, function(success, commandResultText) {
                 if (success) {
-                    // If there's a result entered, store it
-                    if (result) {
-                        // This could be enhanced to actually store the result
-                        console.log('Goal result:', result);
-                    }
-                    
-                    // Refresh the page after successful completion
-                    window.location.reload();
+                    // The commandResultText will be from Quartermaster
+                    $('#add-goal-status').html('<div class="alert alert-success">' + commandResultText + ' Refreshing...</div>');
+                    setTimeout(function() { window.location.reload(); }, 2000);
+                } else {
+                    $('#add-goal-status').html('<div class="alert alert-danger">Error completing goal: ' + commandResultText + '</div>');
                 }
             });
         });
-        
-        // Handle refresh goals button click
-        $('#refresh-goals-btn').on('click', function() {
-            window.location.reload();
-        });
-        
-        // Handle goal command form submission
-        $('#goal-command-form').on('submit', function(e) {
-            e.preventDefault();
-            
-            const command = $('#goal-command-input').val().trim();
-            if (!command) return;
-            
-            // Submit the command
-            submitCommand(command);
-            
-            // Clear the input
-            $('#goal-command-input').val('');
-        });
+
+        // Ensure submitCommand is defined (usually in base.html)
+        // If not, you'd need to implement AJAX call here similar to add-goal-form
+        if (typeof submitCommand === 'undefined') {
+            console.error("submitCommand function is not defined. Make sure it's in base.html.");
+            // Basic fallback if submitCommand is missing
+            window.submitCommand = function(command, callback) {
+                console.warn("Using fallback submitCommand. Define in base.html for full features.");
+                $('#loading-indicator').show(); // Assuming these IDs exist
+                $('#result-container').hide();
+                $.ajax({
+                    url: '/api/submit_task', // This should be your task submission endpoint
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ command: command }),
+                    success: function(response) {
+                        $('#loading-indicator').hide();
+                        $('#result-container').show().text(JSON.stringify(response));
+                        if(callback) callback(response.status === 'success', response.message || JSON.stringify(response.result));
+                    },
+                    error: function(xhr, status, error) {
+                         $('#loading-indicator').hide();
+                        $('#result-container').show().text('Error: ' + error);
+                        if(callback) callback(false, error);
+                    }
+                });
+            };
+        }
     });
 </script>
 {% endblock %}
