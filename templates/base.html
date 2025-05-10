@@ -199,6 +199,48 @@
             <hr class="sidebar-divider">
             <ul class="nav flex-column">
                 <li class="nav-item">
+                    <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+                        <i class="fas fa-fw fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/analyst' in request.path %}active{% endif %}" href="/agent/analyst">
+                        <i class="fas fa-fw fa-search"></i>
+                        <span>Analyst</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/engineer' in request.path %}active{% endif %}" href="/agent/engineer">
+                        <i class="fas fa-fw fa-code"></i>
+                        <span>Engineer</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/scribe' in request.path %}active{% endif %}" href="/agent/scribe">
+                        <i class="fas fa-fw fa-pen-fancy"></i>
+                        <span>Scribe</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/researcher' in request.path %}active{% endif %}" href="/agent/researcher">
+                        <i class="fas fa-fw fa-microscope"></i>
+                        <span>Researcher</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/planner' in request.path %}active{% endif %}" href="/agent/planner">
+                        <i class="fas fa-fw fa-tasks"></i>
+                        <span>Planner</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/quartermaster' in request.path %}active{% endif %}" href="/agent/quartermaster">
+                        <i class="fas fa-fw fa-box"></i>
+                        <span>Quartermaster</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {% if '/agent/sentinel' in request.path %}active{% endif %}" href="/agent/sentinel">
                         <i class="fas fa-fw fa-shield-alt"></i>
                         <span>Sentinel</span>
@@ -325,8 +367,7 @@
                 success: function(response) {
                     console.log('Task status:', response);
                     
-                    if (response.status === 'completed' || response.status === 'error' || response.status === 'blocked') {
-                        $('#loading-indicator').hide();
+                    if (response.status === 'completed' || response.status === 'error' || response.status === 'blocked') {$('#loading-indicator').hide();
                         
                         if (response.status === 'completed') {
                             const resultHtml = '<div class="mb-2"><span class="badge bg-success">Completed</span></div>' + 
@@ -393,45 +434,3 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
-                    <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
-                        <i class="fas fa-fw fa-tachometer-alt"></i>
-                        <span>Dashboard</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if '/agent/analyst' in request.path %}active{% endif %}" href="/agent/analyst">
-                        <i class="fas fa-fw fa-search"></i>
-                        <span>Analyst</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if '/agent/engineer' in request.path %}active{% endif %}" href="/agent/engineer">
-                        <i class="fas fa-fw fa-code"></i>
-                        <span>Engineer</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if '/agent/scribe' in request.path %}active{% endif %}" href="/agent/scribe">
-                        <i class="fas fa-fw fa-pen-fancy"></i>
-                        <span>Scribe</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if '/agent/researcher' in request.path %}active{% endif %}" href="/agent/researcher">
-                        <i class="fas fa-fw fa-microscope"></i>
-                        <span>Researcher</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if '/agent/planner' in request.path %}active{% endif %}" href="/agent/planner">
-                        <i class="fas fa-fw fa-tasks"></i>
-                        <span>Planner</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if '/agent/quartermaster' in request.path %}active{% endif %}" href="/agent/quartermaster">
-                        <i class="fas fa-fw fa-box"></i>
-                        <span>Quartermaster</span>
-                    </a>
-                </li>
-                <li class="nav-item">

@@ -1,4 +1,35 @@
-def __init__(self, quartermaster=None):
+# agents/tools/pdf_generator_tool.py
+from .base_tool import Tool, ToolException
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.lib.units import inch
+import os
+import re
+import markdown
+import tempfile
+from pathlib import Path
+import base64
+from io import BytesIO
+
+class PdfGeneratorTool(Tool):
+    name = "generate_pdf"
+    description = ("Creates PDF documents from provided content. "
+                   "The tool supports text formatting, tables, and images (if provided in base64 format). "
+                   "It can generate reports, documentation, and other professional documents.")
+    argument_schema = {
+        "content": "str: The text content for the PDF document. Can be plain text or Markdown formatted.",
+        "title": "str (optional): The title of the document",
+        "output_path": "str (optional): Path where the PDF should be saved",
+        "page_size": "str (optional): 'letter' or 'a4', defaults to 'letter'",
+        "include_toc": "bool (optional): Whether to include a table of contents, defaults to False",
+        "header_text": "str (optional): Text to appear in the document header",
+        "footer_text": "str (optional): Text to appear in the document footer",
+        "images": "list (optional): List of dictionaries with 'name' and 'data' (base64) or 'path' keys for images to include"
+    }
+    
+    def __init__(self, quartermaster=None):
         super().__init__()
         self.quartermaster = quartermaster  # For reading files
         self.output_dir = "documents"
@@ -335,33 +366,3 @@ def __init__(self, quartermaster=None):
             trace = traceback.format_exc()
             print(f"[PdfGeneratorTool] Error: {trace}")
             raise ToolException(f"PdfGeneratorTool: Failed to create PDF document. Error: {str(e)}")
-# agents/tools/pdf_generator_tool.py
-from .base_tool import Tool, ToolException
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib.units import inch
-import os
-import re
-import markdown
-import tempfile
-from pathlib import Path
-import base64
-from io import BytesIO
-
-class PdfGeneratorTool(Tool):
-    name = "generate_pdf"
-    description = ("Creates PDF documents from provided content. "
-                   "The tool supports text formatting, tables, and images (if provided in base64 format). "
-                   "It can generate reports, documentation, and other professional documents.")
-    argument_schema = {
-        "content": "str: The text content for the PDF document. Can be plain text or Markdown formatted.",
-        "title": "str (optional): The title of the document",
-        "output_path": "str (optional): Path where the PDF should be saved",
-        "page_size": "str (optional): 'letter' or 'a4', defaults to 'letter'",
-        "include_toc": "bool (optional): Whether to include a table of contents, defaults to False",
-        "header_text": "str (optional): Text to appear in the document header",
-        "footer_text": "str (optional): Text to appear in the document footer",
-        "images": "list (optional): List of dictionaries with 'name' and 'data' (base64) or 'path' keys for images to include"
-    }

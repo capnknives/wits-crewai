@@ -197,4 +197,6 @@ class QuartermasterAgent:
 
         return ("Quartermaster: I can manage files and goals. Try commands like 'list files', 'add goal ...', "
                 "'complete goal ...', or 'delete file ...'.")
-    
+def run(self, command):
+    """Alias for handle_command to maintain compatibility with other agents."""
+    return self.handle_command(command)    
