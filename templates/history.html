@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Command History - WITS CrewAI{% endblock %}
+
+{% block page_title %}Command History{% endblock %}
+
+{% block content %}
+<!-- Page content -->
+<div class="row">
+    <!-- History Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Command History</h6>
+                <button class="btn btn-sm btn-primary" id="refresh-history-btn">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                {% if history %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Agent</th>
+                                <th>Command</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in history|reverse %}
+                            <tr>
+                                <td>
+                                    {% if item.timestamp %}
+                                    {{ item.timestamp.split('T')[0] }} {{ item.timestamp.split('T')[1].split('.')[0] }}
+                                    {% else %}
+                                    Unknown time
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge 
+                                        {% if item.agent == 'analyst' %}bg-info
+                                        {% elif item.agent == 'engineer' %}bg-primary
+                                        {% elif item.agent == 'scribe' %}bg-success
+                                        {% elif item.agent == 'researcher' %}bg-warning
+                                        {% elif item.agent == 'planner' %}bg-danger
+                                        {% elif item.agent == 'quartermaster' %}bg-secondary
+                                        {% elif item.agent == 'sentinel' %}bg-dark
+                                        {% else %}bg-light
+                                        {% endif %}">
+                                        {{ item.agent|capitalize }}
+                                    </span>
+                                </td>
+                                <td>{{ item.command }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-primary view-result-btn" data-task-id="{{ item.id }}">
+                                            <i class="fas fa-eye"></i> View Result
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary replay-command-btn" data-command="{{ item.command }}">
+                                            <i class="fas fa-redo"></i> Replay
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-gray-600 py-3">
+                    <i class="fas fa-history fa-2x mb-3"></i>
+                    <p>No command history available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Results Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary" id="result-card-title">Result Viewer</h6>
+            </div>
+            <div class="card-body">
+                <!-- Loading indicator -->
+                <div id="result-loading-indicator" class="loading-indicator" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading result...</p>
+                </div>
+                
+                <!-- Result container -->
+                <div id="history-result-container" class="result-container">
+                    <div class="text-center text-gray-600 py-3">
+                        <i class="fas fa-search fa-2x mb-3"></i>
+                        <p>Select a command from the history to view its result</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Command Form Card (only shown when replaying a command) -->
+<div class="row" id="replay-section" style="display: none;">
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Replay Command</h6>
+            </div>
+            <div class="card-body">
+                <form id="replay-command-form">
+                    <div class="input-group">
+                        <input type="text" class="form-control bg-light border-0 small command-input" 
+                            id="replay-command-input" aria-label="Command" aria-describedby="basic-addon2">
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-paper-plane fa-sm"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Loading indicator -->
+                <div id="replay-loading-indicator" class="loading-indicator mt-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Processing your request...</p>
+                </div>
+                
+                <!-- Result container -->
+                <div id="replay-result-container" class="result-container">
+                    <p class="text-muted">Replay results will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle view result button click
+        $('.view-result-btn').on('click', function() {
+            const taskId = $(this).data('task-id');
+            
+            // Show loading indicator
+            $('#result-loading-indicator').show();
+            $('#history-result-container').hide();
+            
+            // Fetch task result
+            $.ajax({
+                url: '/api/task_status/' + taskId,
+                type: 'GET',
+                success: function(response) {
+                    // Hide loading indicator
+                    $('#result-loading-indicator').hide();
+                    $('#history-result-container').show();
+                    
+                    if (response.status === 'completed' || response.status === 'error' || response.status === 'blocked') {
+                        if (response.result && response.result.agent) {
+                            $('#result-card-title').html('Result: <span class="badge bg-primary">' + response.result.agent + '</span> - ' + response.status);
+                            
+                            let resultHtml = '';
+                            
+                            if (response.status === 'completed') {
+                                resultHtml = '<div class="mb-2"><span class="badge bg-success">Completed</span></div>';
+                            } else if (response.status === 'error') {
+                                resultHtml = '<div class="mb-2"><span class="badge bg-danger">Error</span></div>';
+                            } else if (response.status === 'blocked') {
+                                resultHtml = '<div class="mb-2"><span class="badge bg-warning">Blocked</span></div>';
+                            }
+                            
+                            resultHtml += '<div class="mb-2"><strong>Command:</strong> ' + response.result.command + '</div>';
+                            resultHtml += '<div><strong>Result:</strong></div>';
+                            resultHtml += '<div>' + formatResult(response.result.result) + '</div>';
+                            
+                            $('#history-result-container').html(resultHtml);
+                        } else {
+                            $('#history-result-container').html('<div class="alert alert-warning">No result data available for this task.</div>');
+                        }
+                    } else {
+                        $('#history-result-container').html('<div class="alert alert-info">Task status: ' + response.status + '. Result not available yet.</div>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    // Hide loading indicator
+                    $('#result-loading-indicator').hide();
+                    $('#history-result-container').show();
+                    
+                    $('#history-result-container').html('<div class="alert alert-danger">Error fetching result: ' + error + '</div>');
+                }
+            });
+        });
+        
+        // Handle replay command button click
+        $('.replay-command-btn').on('click', function() {
+            const command = $(this).data('command');
+            
+            // Show replay section
+            $('#replay-section').show();
+            
+            // Set command in input
+            $('#replay-command-input').val(command);
+            
+            // Scroll to replay section
+            $('html, body').animate({
+                scrollTop: $('#replay-section').offset().top - 100
+            }, 500);
+        });
+        
+        // Handle replay command form submission
+        $('#replay-command-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const command = $('#replay-command-input').val().trim();
+            if (!command) return;
+            
+            // Show loading indicator
+            $('#replay-loading-indicator').show();
+            $('#replay-result-container').hide();
+            
+            // Submit the command
+            $.ajax({
+                url: '/api/submit_task',
+                type: 'POST',
+                data: JSON.stringify({ command: command }),
+                success: function(response) {
+                    console.log('Task submitted:', response);
+                    if (response.status === 'success') {
+                        checkReplayTaskStatus(response.task_id);
+                    } else {
+                        $('#replay-loading-indicator').hide();
+                        $('#replay-result-container').show().html('<div class="alert alert-danger">Error: ' + response.message + '</div>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error submitting task:', error);
+                    $('#replay-loading-indicator').hide();
+                    $('#replay-result-container').show().html('<div class="alert alert-danger">Error: ' + error + '</div>');
+                }
+            });
+        });
+        
+        // Function to check replay task status
+        function checkReplayTaskStatus(taskId, attempts = 0) {
+            $.ajax({
+                url: '/api/task_status/' + taskId,
+                type: 'GET',
+                success: function(response) {
+                    console.log('Task status:', response);
+                    
+                    if (response.status === 'completed' || response.status === 'error' || response.status === 'blocked') {
+                        $('#replay-loading-indicator').hide();
+                        
+                        if (response.status === 'completed') {
+                            const resultHtml = '<div class="mb-2"><span class="badge bg-success">Completed</span></div>' + 
+                                              '<div>' + formatResult(response.result.result) + '</div>';
+                            $('#replay-result-container').show().html(resultHtml);
+                        } else if (response.status === 'error') {
+                            const resultHtml = '<div class="mb-2"><span class="badge bg-danger">Error</span></div>' + 
+                                              '<div>' + formatResult(response.result.result) + '</div>';
+                            $('#replay-result-container').show().html(resultHtml);
+                        } else if (response.status === 'blocked') {
+                            const resultHtml = '<div class="mb-2"><span class="badge bg-warning">Blocked</span></div>' + 
+                                              '<div>' + formatResult(response.result.result) + '</div>';
+                            $('#replay-result-container').show().html(resultHtml);
+                        }
+                    } else if (attempts < 120) {  // Poll for up to 2 minutes (120 * 1s)
+                        setTimeout(function() {
+                            checkReplayTaskStatus(taskId, attempts + 1);
+                        }, 1000);  // Check every second
+                    } else {
+                        $('#replay-loading-indicator').hide();
+                        $('#replay-result-container').show().html('<div class="alert alert-warning">Task is taking too long. Please check back later.</div>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error checking task status:', error);
+                    $('#replay-loading-indicator').hide();
+                    $('#replay-result-container').show().html('<div class="alert alert-danger">Error checking task status: ' + error + '</div>');
+                }
+            });
+        }
+        
+        // Handle refresh history button click
+        $('#refresh-history-btn').on('click', function() {
+            window.location.reload();
+        });
+    });
+</script>
+{% endblock %}

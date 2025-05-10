@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WITS CrewAI{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --secondary-color: #1cc88a;
+            --dark-color: #5a5c69;
+            --light-color: #f8f9fc;
+            --danger-color: #e74a3b;
+            --warning-color: #f6c23e;
+            --info-color: #36b9cc;
+        }
+        
+        body {
+            background-color: var(--light-color);
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        .sidebar {
+            min-height: 100vh;
+            background-color: #4e73df;
+            background-image: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
+            background-size: cover;
+        }
+        
+        .sidebar-brand {
+            padding: 1.5rem 1rem;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: white;
+            text-align: center;
+        }
+        
+        .sidebar-divider {
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            margin: 0 1rem 1rem;
+        }
+        
+        .nav-item .nav-link {
+            padding: 0.75rem 1rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .nav-item .nav-link:hover {
+            color: white;
+        }
+        
+        .nav-item .nav-link i {
+            margin-right: 0.5rem;
+        }
+        
+        .content {
+            flex: 1;
+            padding: 1.5rem;
+        }
+        
+        .topbar {
+            height: 4.375rem;
+            background-color: white;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        }
+        
+        .card {
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid #e3e6f0;
+            padding: 0.75rem 1.25rem;
+        }
+        
+        .agent-card {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        
+        .agent-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 2rem 0 rgba(58, 59, 69, 0.2);
+        }
+        
+        .command-input {
+            border-radius: 10rem;
+            font-size: 0.85rem;
+            padding: 1.5rem 1rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-success {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        
+        .btn-circle {
+            border-radius: 100%;
+            height: 2.5rem;
+            width: 2.5rem;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .result-container {
+            background-color: #f8f9fc;
+            border-radius: 0.35rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            border: 1px solid #e3e6f0;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .loading-indicator {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        
+        /* Status badges */
+        .badge-queued {
+            background-color: var(--warning-color);
+        }
+        
+        .badge-processing {
+            background-color: var(--info-color);
+        }
+        
+        .badge-completed {
+            background-color: var(--secondary-color);
+        }
+        
+        .badge-error {
+            background-color: var(--danger-color);
+        }
+        
+        .badge-blocked {
+            background-color: var(--dark-color);
+        }
+        
+        /* Code blocks */
+        pre {
+            background-color: #f7f7f7;
+            border: 1px solid #e1e1e8;
+            border-radius: 4px;
+            padding: 9.5px;
+        }
+        
+        code {
+            font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        
+        /* File list */
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .file-list-item {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #e3e6f0;
+        }
+        
+        .file-list-item:hover {
+            background-color: #f8f9fc;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="d-flex">
+        <!-- Sidebar -->
+        <div class="sidebar col-lg-2 col-md-3 d-none d-md-block">
+            <div class="sidebar-brand">
+                <i class="fas fa-robot"></i> WITS CrewAI
+            </div>
+            <hr class="sidebar-divider">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/sentinel' in request.path %}active{% endif %}" href="/agent/sentinel">
+                        <i class="fas fa-fw fa-shield-alt"></i>
+                        <span>Sentinel</span>
+                    </a>
+                </li>
+                <hr class="sidebar-divider">
+                <li class="nav-item">
+                    <a class="nav-link {% if '/files' in request.path %}active{% endif %}" href="/files">
+                        <i class="fas fa-fw fa-file"></i>
+                        <span>Files</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/goals' in request.path %}active{% endif %}" href="/goals">
+                        <i class="fas fa-fw fa-flag"></i>
+                        <span>Goals</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/history' in request.path %}active{% endif %}" href="/history">
+                        <i class="fas fa-fw fa-history"></i>
+                        <span>History</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/settings' in request.path %}active{% endif %}" href="/settings">
+                        <i class="fas fa-fw fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="content col-lg-10 col-md-9 col-12">
+            <!-- Topbar -->
+            <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+                <!-- Sidebar Toggle (Topbar) -->
+                <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
+                    <i class="fa fa-bars"></i>
+                </button>
+                
+                <!-- Page title -->
+                <div class="d-none d-sm-inline-block ml-md-3">
+                    <h1 class="h3 mb-0 text-gray-800">{% block page_title %}WITS CrewAI Dashboard{% endblock %}</h1>
+                </div>
+                
+                <!-- Topbar Navbar -->
+                <ul class="navbar-nav ml-auto">
+                    <!-- Nav Item - User Information -->
+                    <li class="nav-item dropdown no-arrow">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <span class="mr-2 d-none d-lg-inline text-gray-600 small">User</span>
+                            <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+                        </a>
+                        <!-- Dropdown - User Information -->
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
+                            aria-labelledby="userDropdown">
+                            <a class="dropdown-item" href="/settings">
+                                <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
+                                Settings
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
+                                <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
+                                Logout
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+            </nav>
+            
+            <!-- Page Content -->
+            <div class="container-fluid">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global AJAX setup
+        $.ajaxSetup({
+            contentType: "application/json; charset=utf-8"
+        });
+        
+        // Function to submit a command to an agent
+        function submitCommand(command, callback) {
+            $('#loading-indicator').show();
+            $('#result-container').hide();
+            
+            $.ajax({
+                url: '/api/submit_task',
+                type: 'POST',
+                data: JSON.stringify({ command: command }),
+                success: function(response) {
+                    console.log('Task submitted:', response);
+                    if (response.status === 'success') {
+                        checkTaskStatus(response.task_id, callback);
+                    } else {
+                        $('#loading-indicator').hide();
+                        $('#result-container').show().html('<div class="alert alert-danger">Error: ' + response.message + '</div>');
+                        if (callback) callback(false, response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error submitting task:', error);
+                    $('#loading-indicator').hide();
+                    $('#result-container').show().html('<div class="alert alert-danger">Error: ' + error + '</div>');
+                    if (callback) callback(false, error);
+                }
+            });
+        }
+        
+        // Function to check task status
+        function checkTaskStatus(taskId, callback, attempts = 0) {
+            $.ajax({
+                url: '/api/task_status/' + taskId,
+                type: 'GET',
+                success: function(response) {
+                    console.log('Task status:', response);
+                    
+                    if (response.status === 'completed' || response.status === 'error' || response.status === 'blocked') {
+                        $('#loading-indicator').hide();
+                        
+                        if (response.status === 'completed') {
+                            const resultHtml = '<div class="mb-2"><span class="badge bg-success">Completed</span></div>' + 
+                                              '<div>' + formatResult(response.result.result) + '</div>';
+                            $('#result-container').show().html(resultHtml);
+                            if (callback) callback(true, response.result.result);
+                        } else if (response.status === 'error') {
+                            const resultHtml = '<div class="mb-2"><span class="badge bg-danger">Error</span></div>' + 
+                                              '<div>' + formatResult(response.result.result) + '</div>';
+                            $('#result-container').show().html(resultHtml);
+                            if (callback) callback(false, response.result.result);
+                        } else if (response.status === 'blocked') {
+                            const resultHtml = '<div class="mb-2"><span class="badge bg-warning">Blocked</span></div>' + 
+                                              '<div>' + formatResult(response.result.result) + '</div>';
+                            $('#result-container').show().html(resultHtml);
+                            if (callback) callback(false, response.result.result);
+                        }
+                    } else if (attempts < 120) {  // Poll for up to 2 minutes (120 * 1s)
+                        setTimeout(function() {
+                            checkTaskStatus(taskId, callback, attempts + 1);
+                        }, 1000);  // Check every second
+                    } else {
+                        $('#loading-indicator').hide();
+                        $('#result-container').show().html('<div class="alert alert-warning">Task is taking too long. Please check back later.</div>');
+                        if (callback) callback(false, 'Timeout while waiting for task completion');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error checking task status:', error);
+                    $('#loading-indicator').hide();
+                    $('#result-container').show().html('<div class="alert alert-danger">Error checking task status: ' + error + '</div>');
+                    if (callback) callback(false, error);
+                }
+            });
+        }
+        
+        // Format the result with code highlighting
+        function formatResult(result) {
+            if (!result) return '';
+            
+            // Escape HTML entities
+            let escapedResult = result
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+            
+            // Convert markdown-style code blocks to HTML
+            escapedResult = escapedResult.replace(/```([a-z]*)\n([\s\S]*?)\n```/g, function(match, language, code) {
+                return '<pre><code class="language-' + language + '">' + code + '</code></pre>';
+            });
+            
+            // Convert inline code to HTML
+            escapedResult = escapedResult.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Convert line breaks to <br>
+            escapedResult = escapedResult.replace(/\n/g, '<br>');
+            
+            return escapedResult;
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+                    <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+                        <i class="fas fa-fw fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/analyst' in request.path %}active{% endif %}" href="/agent/analyst">
+                        <i class="fas fa-fw fa-search"></i>
+                        <span>Analyst</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/engineer' in request.path %}active{% endif %}" href="/agent/engineer">
+                        <i class="fas fa-fw fa-code"></i>
+                        <span>Engineer</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/scribe' in request.path %}active{% endif %}" href="/agent/scribe">
+                        <i class="fas fa-fw fa-pen-fancy"></i>
+                        <span>Scribe</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/researcher' in request.path %}active{% endif %}" href="/agent/researcher">
+                        <i class="fas fa-fw fa-microscope"></i>
+                        <span>Researcher</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/planner' in request.path %}active{% endif %}" href="/agent/planner">
+                        <i class="fas fa-fw fa-tasks"></i>
+                        <span>Planner</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/agent/quartermaster' in request.path %}active{% endif %}" href="/agent/quartermaster">
+                        <i class="fas fa-fw fa-box"></i>
+                        <span>Quartermaster</span>
+                    </a>
+                </li>
+                <li class="nav-item">

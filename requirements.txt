@@ -1,0 +1,21 @@
+ollama
+openai-whisper
+sounddevice
+numpy
+requests
+pyyaml
+pytz
+flask
+reportlab
+markdown
+matplotlib
+python-dateutil
+pillow
+markupsafe
+Werkzeug
+itsdangerous
+click
+Jinja2
+sentence-transformers>=2.2.2
+faiss-gpu>=1.7.3  # or faiss-gpu if GPU support is needed
+numpy>=1.22.0

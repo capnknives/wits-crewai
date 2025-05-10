@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}{{ agent_name|capitalize }} Agent - WITS CrewAI{% endblock %}
+
+{% block page_title %}{{ agent_name|capitalize }} Agent{% endblock %}
+
+{% block content %}
+<!-- Page content -->
+<div class="row">
+    <!-- Agent Information Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">{{ agent_name|capitalize }} Agent</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        {% if agent_name == "analyst" %}
+                        <i class="fas fa-search fa-7x text-primary mb-3"></i>
+                        {% elif agent_name == "engineer" %}
+                        <i class="fas fa-code fa-7x text-primary mb-3"></i>
+                        {% elif agent_name == "scribe" %}
+                        <i class="fas fa-pen-fancy fa-7x text-primary mb-3"></i>
+                        {% elif agent_name == "researcher" %}
+                        <i class="fas fa-microscope fa-7x text-primary mb-3"></i>
+                        {% elif agent_name == "planner" %}
+                        <i class="fas fa-tasks fa-7x text-primary mb-3"></i>
+                        {% elif agent_name == "quartermaster" %}
+                        <i class="fas fa-box fa-7x text-primary mb-3"></i>
+                        {% elif agent_name == "sentinel" %}
+                        <i class="fas fa-shield-alt fa-7x text-primary mb-3"></i>
+                        {% else %}
+                        <i class="fas fa-robot fa-7x text-primary mb-3"></i>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-9">
+                        <h4>Description</h4>
+                        <p>{{ agent_description }}</p>
+                        
+                        <h4>Usage</h4>
+                        <p>You can interact with the {{ agent_name|capitalize }} Agent by:</p>
+                        <ul>
+                            <li>Using <code>{{ agent_name }}, [your command]</code> format</li>
+                            <li>Entering commands that match the agent's specialty</li>
+                            <li>Using the command form below</li>
+                        </ul>
+                        
+                        {% if agent_name == "analyst" %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> The Analyst can search the web, analyze data, and provide insights on various topics.
+                        </div>
+                        {% elif agent_name == "engineer" %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> The Engineer specializes in generating and modifying code in various programming languages.
+                        </div>
+                        {% elif agent_name == "scribe" %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> The Scribe can create written content like articles, stories, blog posts, and documentation.
+                        </div>
+                        {% elif agent_name == "researcher" %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> The Researcher conducts thorough, methodical research on complex topics and creates comprehensive reports.
+                        </div>
+                        {% elif agent_name == "planner" %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> The Planner breaks down complex goals into manageable tasks and coordinates workflows across agents.
+                        </div>
+                        {% elif agent_name == "quartermaster" %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> The Quartermaster manages files, resources, and goals for the entire system.
+                        </div>
+                        {% elif agent_name == "sentinel" %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> The Sentinel enforces ethical guidelines and approves potentially sensitive actions.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Command Input Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Command {{ agent_name|capitalize }}</h6>
+            </div>
+            <div class="card-body">
+                <form id="agent-command-form">
+                    <div class="input-group">
+                        <input type="text" class="form-control bg-light border-0 small command-input" 
+                            placeholder="Enter your command for {{ agent_name|capitalize }}" 
+                            id="agent-command-input" aria-label="Command" aria-describedby="basic-addon2">
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-paper-plane fa-sm"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Loading indicator -->
+                <div id="loading-indicator" class="loading-indicator mt-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Processing your request...</p>
+                </div>
+                
+                <!-- Result container -->
+                <div id="result-container" class="result-container">
+                    <p class="text-muted">Your results will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Agent-specific content -->
+    {% if agent_name == "planner" %}
+    <!-- Plans Card for Planner -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Plans</h6>
+                <button class="btn btn-sm btn-primary" id="create-plan-btn">
+                    <i class="fas fa-plus"></i> Create New Plan
+                </button>
+            </div>
+            <div class="card-body">
+                {% if plans %}
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Plan ID</th>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Progress</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Plans will be loaded from API -->
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-gray-600 py-3">
+                    <i class="fas fa-tasks fa-2x mb-3"></i>
+                    <p>No plans available</p>
+                    <button class="btn btn-primary" id="create-first-plan-btn">
+                        <i class="fas fa-plus"></i> Create Your First Plan
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% elif agent_name == "researcher" %}
+    <!-- Research Projects Card for Researcher -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Research Projects</h6>
+                <button class="btn btn-sm btn-primary" id="create-research-btn">
+                    <i class="fas fa-plus"></i> Start New Research
+                </button>
+            </div>
+            <div class="card-body">
+                {% if research_projects %}
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Research ID</th>
+                                <th>Topic</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Research projects will be loaded from API -->
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-gray-600 py-3">
+                    <i class="fas fa-microscope fa-2x mb-3"></i>
+                    <p>No research projects available</p>
+                    <button class="btn btn-primary" id="create-first-research-btn">
+                        <i class="fas fa-plus"></i> Start Your First Research
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Recent Outputs Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Output</h6>
+            </div>
+            <div class="card-body">
+                {% if recent_output %}
+                <div class="result-container">
+                    {{ recent_output|safe }}
+                </div>
+                {% else %}
+                <div class="text-center text-gray-600 py-3">
+                    <i class="fas fa-comment-dots fa-2x mb-3"></i>
+                    <p>No recent output available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Plan Modal for Planner -->
+{% if agent_name == "planner" %}
+<div class="modal fade" id="createPlanModal" tabindex="-1" aria-labelledby="createPlanModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createPlanModalLabel">Create New Plan</h5>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submit-research-btn">Start Research</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle agent command form submission
+        $('#agent-command-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const command = $('#agent-command-input').val().trim();
+            if (!command) return;
+            
+            let fullCommand = command;
+            // If command doesn't start with agent name, prepend it
+            if (!command.toLowerCase().startsWith('{{ agent_name.lower() }}')) {
+                fullCommand = '{{ agent_name }}, ' + command;
+            }
+            
+            // Submit the command
+            submitCommand(fullCommand);
+            
+            // Clear the input
+            $('#agent-command-input').val('');
+        });
+        
+        {% if agent_name == "planner" %}
+        // Planner-specific JS
+        $('#create-plan-btn, #create-first-plan-btn').on('click', function() {
+            $('#createPlanModal').modal('show');
+        });
+        
+        $('#submit-plan-btn').on('click', function() {
+            const goal = $('#plan-goal').val().trim();
+            if (!goal) {
+                alert('Please enter a goal description');
+                return;
+            }
+            
+            // Hide modal
+            $('#createPlanModal').modal('hide');
+            
+            // Submit command to create plan
+            const command = 'Planner, create plan for ' + goal;
+            submitCommand(command);
+            
+            // Clear the input
+            $('#plan-goal').val('');
+        });
+        {% endif %}
+        
+        {% if agent_name == "researcher" %}
+        // Researcher-specific JS
+        $('#create-research-btn, #create-first-research-btn').on('click', function() {
+            $('#createResearchModal').modal('show');
+        });
+        
+        $('#submit-research-btn').on('click', function() {
+            const topic = $('#research-topic').val().trim();
+            if (!topic) {
+                alert('Please enter a research topic');
+                return;
+            }
+            
+            // Hide modal
+            $('#createResearchModal').modal('hide');
+            
+            // Submit command to create research
+            const command = 'Researcher, research on ' + topic;
+            submitCommand(command);
+            
+            // Clear the input
+            $('#research-topic').val('');
+        });
+        {% endif %}
+    });
+</script>
+{% endblock %}-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="create-plan-form">
+                    <div class="mb-3">
+                        <label for="plan-goal" class="form-label">Goal Description</label>
+                        <textarea class="form-control" id="plan-goal" rows="3" placeholder="Describe what you want to accomplish"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submit-plan-btn">Create Plan</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Create Research Modal for Researcher -->
+{% if agent_name == "researcher" %}
+<div class="modal fade" id="createResearchModal" tabindex="-1" aria-labelledby="createResearchModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createResearchModalLabel">Start New Research</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="create-research-form">
+                    <div class="mb-3">
+                        <label for="research-topic" class="form-label">Research Topic</label>
+                        <textarea class="form-control" id="research-topic" rows="3" placeholder="What topic would you like to research?"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn

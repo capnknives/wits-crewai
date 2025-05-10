@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - WITS CrewAI{% endblock %}
+
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<!-- Page content -->
+<div class="row">
+    <!-- System Settings Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">System Settings</h6>
+            </div>
+            <div class="card-body">
+                <form id="system-settings-form">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="internet-access" 
+                                    {% if config.internet_access %}checked{% endif %}>
+                                <label class="form-check-label" for="internet-access">Internet Access</label>
+                                <small class="form-text text-muted d-block">Allow agents to access the internet for searches and external information</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="ethics-enabled" 
+                                    {% if config.ethics_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="ethics-enabled">Ethics Filter</label>
+                                <small class="form-text text-muted d-block">Enable ethical review and filtering of agent actions and outputs</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="allow-code-execution" 
+                                    {% if config.allow_code_execution %}checked{% endif %}>
+                                <label class="form-check-label" for="allow-code-execution">Allow Code Execution</label>
+                                <small class="form-text text-muted d-block">Allow generated code to be executed (CAUTION: Security risk!)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="voice-input" 
+                                    {% if config.voice_input %}checked{% endif %}>
+                                <label class="form-check-label" for="voice-input">Voice Input</label>
+                                <small class="form-text text-muted d-block">Enable voice commands using Whisper</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="output-directory" class="form-label">Output Directory</label>
+                            <input type="text" class="form-control" id="output-directory" 
+                                value="{{ config.output_directory }}">
+                            <small class="form-text text-muted">Directory where files will be saved</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="fallback-agent" class="form-label">Default Agent</label>
+                            <select class="form-select" id="fallback-agent">
+                                <option value="analyst" {% if config.router.fallback_agent == 'analyst' %}selected{% endif %}>Analyst</option>
+                                <option value="engineer" {% if config.router.fallback_agent == 'engineer' %}selected{% endif %}>Engineer</option>
+                                <option value="scribe" {% if config.router.fallback_agent == 'scribe' %}selected{% endif %}>Scribe</option>
+                                <option value="researcher" {% if config.router.fallback_agent == 'researcher' %}selected{% endif %}>Researcher</option>
+                                <option value="planner" {% if config.router.fallback_agent == 'planner' %}selected{% endif %}>Planner</option>
+                                <option value="quartermaster" {% if config.router.fallback_agent == 'quartermaster' %}selected{% endif %}>Quartermaster</option>
+                            </select>
+                            <small class="form-text text-muted">Default agent when not specified in command</small>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save System Settings</button>
+                </form>
+                <div id="system-settings-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Model Settings Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Model Settings</h6>
+            </div>
+            <div class="card-body">
+                <form id="model-settings-form">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="default-model" class="form-label">Default Model</label>
+                            <input type="text" class="form-control" id="default-model" 
+                                value="{{ config.models.default }}">
+                            <small class="form-text text-muted">Default model for all agents unless specified below</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="analyst-model" class="form-label">Analyst Model</label>
+                            <input type="text" class="form-control" id="analyst-model" 
+                                value="{{ config.models.analyst if config.models.analyst else config.models.default }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="engineer-model" class="form-label">Engineer Model</label>
+                            <input type="text" class="form-control" id="engineer-model" 
+                                value="{{ config.models.engineer if config.models.engineer else config.models.default }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="scribe-model" class="form-label">Scribe Model</label>
+                            <input type="text" class="form-control" id="scribe-model" 
+                                value="{{ config.models.scribe if config.models.scribe else config.models.default }}">
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Models must be available in your Ollama instance. Examples: llama2, codellama:7b, mistral, phi, etc.
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Model Settings</button>
+                </form>
+                <div id="model-settings-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Voice Settings Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Voice Input Settings</h6>
+            </div>
+            <div class="card-body">
+                <form id="voice-settings-form">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="whisper-model" class="form-label">Whisper Model</label>
+                            <select class="form-select" id="whisper-model">
+                                <option value="tiny" {% if config.whisper_model == 'tiny' %}selected{% endif %}>Tiny (fastest, least accurate)</option>
+                                <option value="base" {% if config.whisper_model == 'base' %}selected{% endif %}>Base (balanced)</option>
+                                <option value="small" {% if config.whisper_model == 'small' %}selected{% endif %}>Small (more accurate)</option>
+                                <option value="medium" {% if config.whisper_model == 'medium' %}selected{% endif %}>Medium (accurate, slower)</option>
+                                <option value="large" {% if config.whisper_model == 'large' %}selected{% endif %}>Large (most accurate, slowest)</option>
+                            </select>
+                            <small class="form-text text-muted">Speech recognition model</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="voice-duration" class="form-label">Max Recording Duration (s)</label>
+                            <input type="number" class="form-control" id="voice-duration" 
+                                value="{{ config.voice_input_duration }}" min="1" max="60">
+                            <small class="form-text text-muted">Maximum recording time in seconds</small>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="whisper-fp16" 
+                                    {% if config.whisper_fp16 %}checked{% endif %}>
+                                <label class="form-check-label" for="whisper-fp16">Use FP16 Precision</label>
+                                <small class="form-text text-muted d-block">Faster on compatible GPUs</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Voice input requires a microphone and the Whisper library. Larger models provide better accuracy but use more memory and CPU.
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Voice Settings</button>
+                </form>
+                <div id="voice-settings-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Web Interface Settings Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Web Interface Settings</h6>
+            </div>
+            <div class="card-body">
+                <form id="web-settings-form">
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label for="web-port" class="form-label">Port</label>
+                            <input type="number" class="form-control" id="web-port" 
+                                value="{{ config.web_interface.port }}" min="1" max="65535">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="web-host" class="form-label">Host</label>
+                            <input type="text" class="form-control" id="web-host" 
+                                value="{{ config.web_interface.host }}">
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="web-debug" 
+                                    {% if config.web_interface.debug %}checked{% endif %}>
+                                <label class="form-check-label" for="web-debug">Debug Mode</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="enable-uploads" 
+                                    {% if config.web_interface.enable_file_uploads %}checked{% endif %}>
+                                <label class="form-check-label" for="enable-uploads">Enable File Uploads</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="max-file-size" class="form-label">Max File Upload Size (MB)</label>
+                            <input type="number" class="form-control" id="max-file-size" 
+                                value="{{ config.web_interface.max_file_size }}" min="1" max="100">
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Changes to web interface settings will require a server restart to take effect.
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Web Interface Settings</button>
+                </form>
+                <div id="web-settings-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Actions Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">System Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Clear Memory</h5>
+                                <p class="card-text">Reset the memory system, clearing all stored context.</p>
+                                <button class="btn btn-warning" id="clear-memory-btn">
+                                    <i class="fas fa-trash"></i> Clear Memory
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Restart System</h5>
+                                <p class="card-text">Restart the WITS CrewAI system (not implemented).</p>
+                                <button class="btn btn-danger" id="restart-system-btn" disabled>
+                                    <i class="fas fa-power-off"></i> Restart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Test Connection</h5>
+                                <p class="card-text">Test connection to Ollama and other services.</p>
+                                <button class="btn btn-primary" id="test-connection-btn">
+                                    <i class="fas fa-vial"></i> Run Tests
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="system-actions-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clear Memory Confirmation Modal -->
+<div class="modal fade" id="clearMemoryModal" tabindex="-1" aria-labelledby="clearMemoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="clearMemoryModalLabel">Confirm Memory Clear</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> Warning: This will clear all memory data, including goals, conversations, and agent state.
+                </div>
+                <p>Are you sure you want to proceed? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-clear-memory-btn">Clear Memory</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle system settings form submission
+        $('#system-settings-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const settings = {
+                internet_access: $('#internet-access').is(':checked'),
+                ethics_enabled: $('#ethics-enabled').is(':checked'),
+                allow_code_execution: $('#allow-code-execution').is(':checked'),
+                voice_input: $('#voice-input').is(':checked'),
+                output_directory: $('#output-directory').val(),
+                router: {
+                    fallback_agent: $('#fallback-agent').val()
+                }
+            };
+            
+            saveSettings(settings, '#system-settings-status');
+        });
+        
+        // Handle model settings form submission
+        $('#model-settings-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const settings = {
+                models: {
+                    default: $('#default-model').val(),
+                    analyst: $('#analyst-model').val(),
+                    engineer: $('#engineer-model').val(),
+                    scribe: $('#scribe-model').val()
+                }
+            };
+            
+            saveSettings(settings, '#model-settings-status');
+        });
+        
+        // Handle voice settings form submission
+        $('#voice-settings-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const settings = {
+                whisper_model: $('#whisper-model').val(),
+                voice_input_duration: parseInt($('#voice-duration').val()),
+                whisper_fp16: $('#whisper-fp16').is(':checked')
+            };
+            
+            saveSettings(settings, '#voice-settings-status');
+        });
+        
+        // Handle web interface settings form submission
+        $('#web-settings-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const settings = {
+                web_interface: {
+                    port: parseInt($('#web-port').val()),
+                    host: $('#web-host').val(),
+                    debug: $('#web-debug').is(':checked'),
+                    enable_file_uploads: $('#enable-uploads').is(':checked'),
+                    max_file_size: parseInt($('#max-file-size').val())
+                }
+            };
+            
+            saveSettings(settings, '#web-settings-status');
+        });
+        
+        // Generic function to save settings
+        function saveSettings(settings, statusSelector) {
+            $.ajax({
+                url: '/api/settings',
+                type: 'POST',
+                data: JSON.stringify(settings),
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $(statusSelector).html('<div class="alert alert-success">Settings saved successfully!</div>');
+                    } else {
+                        $(statusSelector).html('<div class="alert alert-danger">Error: ' + response.message + '</div>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $(statusSelector).html('<div class="alert alert-danger">Error: ' + error + '</div>');
+                }
+            });
+        }
+        
+        // Handle clear memory button click
+        $('#clear-memory-btn').on('click', function() {
+            $('#clearMemoryModal').modal('show');
+        });
+        
+        // Handle confirm clear memory button click
+        $('#confirm-clear-memory-btn').on('click', function() {
+            $('#clearMemoryModal').modal('hide');
+            
+            // Send command to clear memory
+            const command = 'Memory flush';
+            
+            // Show loading status
+            $('#system-actions-status').html('<div class="alert alert-info">Clearing memory...</div>');
+            
+            submitCommand(command, function(success, result) {
+                if (success) {
+                    $('#system-actions-status').html('<div class="alert alert-success">Memory cleared successfully!</div>');
+                } else {
+                    $('#system-actions-status').html('<div class="alert alert-danger">Error clearing memory: ' + result + '</div>');
+                }
+            });
+        });
+        
+        // Handle test connection button click
+        $('#test-connection-btn').on('click', function() {
+            // Show loading status
+            $('#system-actions-status').html('<div class="alert alert-info">Testing connections...</div>');
+            
+            // Send command to test connections
+            const command = 'Quartermaster, test connections';
+            
+            submitCommand(command, function(success, result) {
+                if (success) {
+                    $('#system-actions-status').html('<div class="alert alert-success">Connection tests completed. Results:<br>' + result + '</div>');
+                } else {
+                    $('#system-actions-status').html('<div class="alert alert-danger">Error testing connections: ' + result + '</div>');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

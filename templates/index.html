@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}WITS CrewAI Dashboard{% endblock %}
+
+{% block page_title %}WITS CrewAI Dashboard{% endblock %}
+
+{% block content %}
+<!-- Page content -->
+<div class="row">
+    <!-- Command Input Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Command Center</h6>
+            </div>
+            <div class="card-body">
+                <form id="command-form">
+                    <div class="input-group">
+                        <input type="text" class="form-control bg-light border-0 small command-input" 
+                            placeholder="Enter a command (e.g., 'Analyst, search for recent AI news')" 
+                            id="command-input" aria-label="Command" aria-describedby="basic-addon2">
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-paper-plane fa-sm"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Loading indicator -->
+                <div id="loading-indicator" class="loading-indicator mt-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Processing your request...</p>
+                </div>
+                
+                <!-- Result container -->
+                <div id="result-container" class="result-container">
+                    <p class="text-muted">Your results will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Agents Grid -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Available Agents</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for agent in agents %}
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-primary shadow h-100 py-2 agent-card" onclick="window.location.href='/agent/{{ agent.name }}'">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Agent</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ agent.name|capitalize }}</div>
+                                        <div class="small text-gray-600 mt-2">{{ agent.description }}</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        {% if agent.name == "analyst" %}
+                                        <i class="fas fa-search fa-2x text-gray-300"></i>
+                                        {% elif agent.name == "engineer" %}
+                                        <i class="fas fa-code fa-2x text-gray-300"></i>
+                                        {% elif agent.name == "scribe" %}
+                                        <i class="fas fa-pen-fancy fa-2x text-gray-300"></i>
+                                        {% elif agent.name == "researcher" %}
+                                        <i class="fas fa-microscope fa-2x text-gray-300"></i>
+                                        {% elif agent.name == "planner" %}
+                                        <i class="fas fa-tasks fa-2x text-gray-300"></i>
+                                        {% elif agent.name == "quartermaster" %}
+                                        <i class="fas fa-box fa-2x text-gray-300"></i>
+                                        {% elif agent.name == "sentinel" %}
+                                        <i class="fas fa-shield-alt fa-2x text-gray-300"></i>
+                                        {% else %}
+                                        <i class="fas fa-robot fa-2x text-gray-300"></i>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Access Row -->
+    <div class="col-lg-6">
+        <!-- Goals Card -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Current Goals</h6>
+                <a href="/goals" class="btn btn-sm btn-primary">
+                    <i class="fas fa-flag"></i> View All
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% if goals %}
+                        {% for goal in goals[:5] %}
+                        <div class="list-group-item">
+                            {{ goal }}
+                        </div>
+                        {% endfor %}
+                        {% if goals|length > 5 %}
+                        <div class="list-group-item text-center">
+                            <a href="/goals">View all {{ goals|length }} goals</a>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center text-gray-600 py-3">
+                            <i class="fas fa-flag fa-2x mb-3"></i>
+                            <p>No active goals</p>
+                            <a href="/goals" class="btn btn-sm btn-primary">
+                                Add a goal
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <!-- Recent Files Card -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Files</h6>
+                <a href="/files" class="btn btn-sm btn-primary">
+                    <i class="fas fa-file"></i> View All
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="list-group file-list">
+                    {% if files %}
+                        {% for file in files[:5] %}
+                        <div class="list-group-item file-list-item">
+                            <i class="fas fa-file mr-2"></i>
+                            <a href="/files/{{ file }}" target="_blank">{{ file }}</a>
+                        </div>
+                        {% endfor %}
+                        {% if files|length > 5 %}
+                        <div class="list-group-item text-center">
+                            <a href="/files">View all {{ files|length }} files</a>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center text-gray-600 py-3">
+                            <i class="fas fa-file fa-2x mb-3"></i>
+                            <p>No files available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle command form submission
+        $('#command-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const command = $('#command-input').val().trim();
+            if (!command) return;
+            
+            // Submit the command
+            submitCommand(command);
+            
+            // Clear the input
+            $('#command-input').val('');
+        });
+    });
+</script>
+{% endblock %}

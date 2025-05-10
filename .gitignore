@@ -1,0 +1,49 @@
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+*.cover
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Project specific
+memory.json
+enhanced_memory.json
+vector_memory.json
+vector_index.bin
+message_history.json
+output/*
+!output/.gitkeep
+!output/visualizations/.gitkeep
+!output/documents/.gitkeep
+!output/research_notes/.gitkeep
+!output/plans/.gitkeep

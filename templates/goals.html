@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}Goals - WITS CrewAI{% endblock %}
+
+{% block page_title %}Goals{% endblock %}
+
+{% block content %}
+<!-- Page content -->
+<div class="row">
+    <!-- Add Goal Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Add New Goal</h6>
+            </div>
+            <div class="card-body">
+                <form id="add-goal-form">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <input type="text" class="form-control" id="goal-description" placeholder="Enter goal description">
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="goal-agent">
+                                <option value="">No specific agent</option>
+                                <option value="Analyst">Analyst</option>
+                                <option value="Engineer">Engineer</option>
+                                <option value="Scribe">Scribe</option>
+                                <option value="Researcher">Researcher</option>
+                                <option value="Planner">Planner</option>
+                                <option value="Quartermaster">Quartermaster</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <button type="submit" class="btn btn-primary w-100">Add</button>
+                        </div>
+                    </div>
+                </form>
+                <div id="add-goal-status" class="mt-2"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Current Goals Card -->
+    <div class="col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Current Goals</h6>
+                <button class="btn btn-sm btn-primary" id="refresh-goals-btn">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                {% if goals %}
+                <div class="list-group">
+                    {% for goal in goals %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>{{ goal }}</div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-success complete-goal-btn" data-goal="{{ goal }}">
+                                <i class="fas fa-check"></i> Complete
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-gray-600 py-3">
+                    <i class="fas fa-flag fa-2x mb-3"></i>
+                    <p>No active goals</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Completed Goals Card -->
+    <div class="col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Completed Goals</h6>
+            </div>
+            <div class="card-body">
+                {% if completed %}
+                <div class="list-group">
+                    {% for goal in completed %}
+                    <div class="list-group-item">
+                        <i class="fas fa-check-circle text-success me-2"></i> {{ goal }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-gray-600 py-3">
+                    <i class="fas fa-flag-checkered fa-2x mb-3"></i>
+                    <p>No completed goals yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Goal Commands Card -->
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Goal Commands</h6>
+            </div>
+            <div class="card-body">
+                <p>Here are some example commands you can use to manage goals:</p>
+                <ul>
+                    <li><code>Quartermaster, add goal Research AI ethics</code> - Add a new goal</li>
+                    <li><code>Quartermaster, add goal Create Python script for data analysis for Engineer</code> - Add a goal for a specific agent</li>
+                    <li><code>Quartermaster, list goals</code> - List all current goals</li>
+                    <li><code>Quartermaster, complete goal 2</code> - Mark a goal as completed by its number</li>
+                    <li><code>Quartermaster, complete goal research</code> - Mark a goal as completed by matching text</li>
+                </ul>
+                
+                <form id="goal-command-form">
+                    <div class="input-group mt-3">
+                        <input type="text" class="form-control bg-light border-0 small command-input" 
+                            placeholder="Enter a goal command (e.g., 'Quartermaster, list goals')" 
+                            id="goal-command-input" aria-label="Command" aria-describedby="basic-addon2">
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-paper-plane fa-sm"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Loading indicator -->
+                <div id="loading-indicator" class="loading-indicator mt-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Processing your request...</p>
+                </div>
+                
+                <!-- Result container -->
+                <div id="result-container" class="result-container">
+                    <p class="text-muted">Your results will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Goal Modal -->
+<div class="modal fade" id="completeGoalModal" tabindex="-1" aria-labelledby="completeGoalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="completeGoalModalLabel">Complete Goal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to mark this goal as completed?</p>
+                <p><strong>Goal: </strong><span id="complete-goal-text"></span></p>
+                
+                <div class="mb-3">
+                    <label for="goal-result" class="form-label">Result (optional)</label>
+                    <textarea class="form-control" id="goal-result" rows="3" placeholder="Enter any results or notes"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirm-complete-btn">Complete</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle add goal form submission
+        $('#add-goal-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const description = $('#goal-description').val().trim();
+            if (!description) {
+                $('#add-goal-status').html('<div class="alert alert-warning">Please enter a goal description.</div>');
+                return;
+            }
+            
+            const agent = $('#goal-agent').val();
+            
+            $.ajax({
+                url: '/api/goals',
+                type: 'POST',
+                data: JSON.stringify({ 
+                    task: description,
+                    agent: agent 
+                }),
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $('#add-goal-status').html('<div class="alert alert-success">Goal added successfully!</div>');
+                        // Refresh the page after successful addition
+                        window.location.reload();
+                    } else {
+                        $('#add-goal-status').html('<div class="alert alert-danger">Error: ' + response.message + '</div>');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $('#add-goal-status').html('<div class="alert alert-danger">Error: ' + error + '</div>');
+                }
+            });
+        });
+        
+        // Handle complete goal button click
+        $('.complete-goal-btn').on('click', function() {
+            const goal = $(this).data('goal');
+            $('#complete-goal-text').text(goal);
+            $('#completeGoalModal').modal('show');
+        });
+        
+        // Handle complete confirmation
+        $('#confirm-complete-btn').on('click', function() {
+            const goal = $('#complete-goal-text').text();
+            const result = $('#goal-result').val().trim();
+            
+            // Hide modal
+            $('#completeGoalModal').modal('hide');
+            
+            // Send command to complete goal
+            let command = 'Quartermaster, complete goal ' + goal;
+            submitCommand(command, function(success, commandResult) {
+                if (success) {
+                    // If there's a result entered, store it
+                    if (result) {
+                        // This could be enhanced to actually store the result
+                        console.log('Goal result:', result);
+                    }
+                    
+                    // Refresh the page after successful completion
+                    window.location.reload();
+                }
+            });
+        });
+        
+        // Handle refresh goals button click
+        $('#refresh-goals-btn').on('click', function() {
+            window.location.reload();
+        });
+        
+        // Handle goal command form submission
+        $('#goal-command-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const command = $('#goal-command-input').val().trim();
+            if (!command) return;
+            
+            // Submit the command
+            submitCommand(command);
+            
+            // Clear the input
+            $('#goal-command-input').val('');
+        });
+    });
+</script>
+{% endblock %}

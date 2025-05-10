@@ -1,0 +1,43 @@
+# WITS CrewAI Configuration
+
+# General Settings
+internet_access: true        # Allow agents to access the internet (web search) if true
+allow_code_execution: true   # If true, allows actual execution of generated code (BE VERY CAREFUL WITH THIS!)
+ethics_enabled: true         # Enable or disable the ethics filter and sentinel checks globally
+output_directory: "output"   # Default directory for files written by agents
+
+# Voice Input Settings
+voice_input: false           # Enable voice command input via Whisper if true (uses CLI if false)
+voice_input_duration: 5      # Maximum listening duration in seconds for each voice command
+whisper_model: base          # Whisper model to use for transcription (tiny, base, small, medium, large)
+whisper_fp16: false          # Whether to use half-precision (FP16) for Whisper model (faster on compatible GPUs)
+
+# Model selection for each agent (Ollama model names)
+# Ensure these models are pulled and available in your Ollama instance.
+models:
+  default: llama2             # Default LLM for general tasks or if a specific agent model isn't listed
+  scribe: llama2              # Model for the ScribeAgent (content creation)
+  analyst: llama2             # Model for the AnalystAgent (research, summarization)
+  engineer: codellama:7b      # Use a code-specialized model for the EngineerAgent (e.g., codellama, deepseek-coder)
+  researcher: llama2          # Model for the ResearcherAgent (in-depth research and synthesis)
+  planner: llama2             # Model for the PlannerAgent (task planning and coordination)
+
+# Router settings
+router:
+  fallback_agent: analyst     # Default agent to use when no specific agent is identified in command
+
+# Web Interface Settings
+web_interface:
+  enabled: true               # Whether to enable the web interface
+  port: 5000                  # Port to run the web server on
+  host: "0.0.0.0"             # Host to bind the web server to (0.0.0.0 = all interfaces)
+  debug: true                 # Whether to run Flask in debug mode
+  enable_file_uploads: true   # Whether to allow file uploads through the web interface
+  max_file_size: 5            # Maximum file upload size in MB
+
+# (Future Gemini API Settings - Placeholder)
+# gemini:
+#   api_key: "YOUR_GEMINI_API_KEY_HERE" # Store your API key securely, consider environment variables
+#   models:
+#     default_text: "gemini-1.5-flash"
+#     analyst_gemini_model: "gemini-pro" # Example
