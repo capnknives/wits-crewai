@@ -77,10 +77,48 @@ class ResearcherAgent:
     def _call_llm(self, prompt: str):
         """Call the LLM with the given prompt"""
         print(f"\n[ResearcherAgent] Sending prompt to LLM (model: {self.model_name}):\n{prompt[:500]}...\n-----------------------------")
-        ollama_response = ollama.generate(model=self.model_name, prompt=prompt)
+        ollama_response = ollama.generate(
+            model=self.model_name, 
+            prompt=prompt,
+            options={"temperature": 0.2}  # Lower temperature for more deterministic responses
+        )
         llm_output = ollama_response['response'].strip()
         print(f"[ResearcherAgent] LLM Output (truncated):\n{llm_output[:500]}...\n-----------------------------")
         return llm_output
+    
+    def _execute_tool(self, tool_name, tool_args):
+        """Execute a tool by name with the given arguments"""
+        print(f"[ResearcherAgent] Executing tool: {tool_name} with args: {tool_args}")
+        
+        # Find the requested tool
+        tool = next((t for t in self.tools if t.name == tool_name), None)
+        
+        if not tool:
+            raise ToolException(f"Tool '{tool_name}' not found or not available")
+        
+        # Execute the tool with Sentinel approval
+        self.sentinel.approve_action(
+            agent_name="ResearcherAgent",
+            action_type=f"tool_use:{tool.name}",
+            detail=str(tool_args)
+        )
+        
+        # Actually execute the tool
+        tool_output = tool.execute(**tool_args)
+        
+        # Process specific tool outputs if needed
+        if tool_name == "internet_search":
+            # Add as a source
+            source_info = {
+                "title": f"Web search for: {tool_args.get('query', 'unknown query')}",
+                "type": "web_search",
+                "summary": tool_output[:500] + "..." if len(tool_output) > 500 else tool_output
+            }
+            
+            if self.current_research_id:
+                self.add_source(self.current_research_id, source_info)
+        
+        return tool_output
     
     def _generate_research_prompt(self, query, context="", stage="initial"):
         """Generate a prompt for the LLM based on the research stage"""
@@ -92,6 +130,11 @@ class ResearcherAgent:
             "on complex topics. Your expertise is in breaking down research questions, "
             "gathering relevant information from multiple sources, analyzing findings, "
             "and synthesizing comprehensive answers with proper citation.\n\n"
+            "IMPORTANT: When you identify a need to use a tool, DO NOT just describe what the tool would return "
+            "or show example outputs. ACTUALLY use the tool by outputting a proper JSON object as shown in the "
+            "tool usage instructions. Your JSON will be processed and the actual tool will be executed with real results.\n\n"
+            "After receiving tool results, incorporate the real information into your analysis - don't pretend "
+            "you've already seen results you haven't actually obtained yet.\n\n"
         )
         
         # Context includes previous research steps if any
@@ -363,36 +406,22 @@ class ResearcherAgent:
                     return self.get_research_details(research_id)
             
             # Handle generic research requests like "build a report on..."
-            if any(keyword in cmd_lower for keyword in ["research", "build a report", "compile a report", "analyze", "investigate"]):
+            if any(keyword in cmd_lower for keyword in ["research", "build a report", "compile a report", "analyze", "investigate", "study"]):
                 # Initialize a new research project
                 research_id = self.start_new_research(command)
                 self.current_research_id = research_id
                 
                 # First, let's do a web search to gather information
                 search_terms = command
-                for prefix in ["research on", "build a report on", "compile a report on", "analyze", "investigate"]:
+                for prefix in ["research on", "build a report on", "compile a report on", "analyze", "investigate", "study"]:
                     if search_terms.lower().startswith(prefix):
                         search_terms = search_terms[len(prefix):].strip()
                 
                 # Execute the web search directly
                 search_results = ""
-                web_search_tool = next((t for t in self.tools if t.name == "internet_search"), None)
-                if web_search_tool:
-                    try:
-                        self.sentinel.approve_action(
-                            agent_name="ResearcherAgent",
-                            action_type="tool_use:internet_search",
-                            detail=f"Search query: {search_terms}"
-                        )
-                        search_results = web_search_tool.execute(query=search_terms)
-                        
-                        # Add as a source
-                        source_info = {
-                            "title": f"Web search for: {search_terms}",
-                            "type": "web_search",
-                            "summary": search_results
-                        }
-                        self.add_source(research_id, source_info)
+                try:
+                    if "internet_search" in [t.name for t in self.tools]:
+                        search_results = self._execute_tool("internet_search", {"query": search_terms})
                         
                         # Update the notebook with search results
                         self.update_notebook(
@@ -400,25 +429,50 @@ class ResearcherAgent:
                             "Information Gathering", 
                             f"### Web Search Results\n**Query:** {search_terms}\n\n**Results:**\n{search_results}\n\n"
                         )
-                    except Exception as e:
-                        search_results = f"Error performing web search: {str(e)}"
-                        self.update_notebook(
-                            research_id, 
-                            "Information Gathering", 
-                            f"### Web Search Error\n**Query:** {search_terms}\n\n**Error:**\n{search_results}\n\n"
-                        )
+                except Exception as e:
+                    search_results = f"Error performing web search: {str(e)}"
+                    self.update_notebook(
+                        research_id, 
+                        "Information Gathering", 
+                        f"### Web Search Error\n**Query:** {search_terms}\n\n**Error:**\n{search_results}\n\n"
+                    )
                 
                 # Now generate research plan using the search results as context
                 research_context = f"Initial search results:\n{search_results}\n\n" if search_results else ""
                 research_prompt = self._generate_research_prompt(command, context=research_context, stage="initial")
                 
-                # Modify the prompt to explicitly identify as a Researcher Agent (not Analyst)
-                research_prompt = research_prompt.replace(
-                    "You are a Research Agent", 
-                    "You are a Researcher Agent (NOT an Analyst Agent)"
-                )
-                
                 plan_output = self._call_llm(research_prompt)
+                
+                # Check if the output is a tool request (JSON format)
+                if plan_output.strip().startswith("{") and "tool_to_use" in plan_output:
+                    try:
+                        tool_request = json.loads(plan_output)
+                        tool_name = tool_request.get("tool_to_use")
+                        tool_args = tool_request.get("tool_arguments", {})
+                        
+                        try:
+                            # Execute the tool
+                            tool_output = self._execute_tool(tool_name, tool_args)
+                            
+                            # Update the notebook with the tool output
+                            self.update_notebook(
+                                research_id,
+                                "Information Gathering",
+                                f"### Tool: {tool_name}\n**Arguments:** {json.dumps(tool_args)}\n\n**Results:**\n{tool_output}\n\n"
+                            )
+                            
+                            # Update the plan based on the tool output
+                            plan_prompt = self._generate_research_prompt(
+                                command,
+                                context=f"Tool '{tool_name}' output:\n{tool_output}\n\n",
+                                stage="initial"
+                            )
+                            plan_output = self._call_llm(plan_prompt)
+                        except Exception as e:
+                            plan_output += f"\n\nError executing tool: {str(e)}"
+                    except json.JSONDecodeError:
+                        # Not valid JSON, treat as a regular plan
+                        pass
                 
                 # Update the research notebook with the plan
                 self.update_notebook(research_id, "Research Plan", plan_output)
@@ -433,13 +487,39 @@ class ResearcherAgent:
                         stage="analysis"
                     )
                     
-                    # Ensure we identify as a Researcher Agent
-                    analysis_prompt = analysis_prompt.replace(
-                        "You are a Research Agent", 
-                        "You are a Researcher Agent (NOT an Analyst Agent)"
-                    )
-                    
                     analysis_output = self._call_llm(analysis_prompt)
+                    
+                    # Check if analysis output is a tool request
+                    if analysis_output.strip().startswith("{") and "tool_to_use" in analysis_output:
+                        try:
+                            tool_request = json.loads(analysis_output)
+                            tool_name = tool_request.get("tool_to_use")
+                            tool_args = tool_request.get("tool_arguments", {})
+                            
+                            try:
+                                # Execute the tool
+                                tool_output = self._execute_tool(tool_name, tool_args)
+                                
+                                # Update the notebook with the tool output
+                                self.update_notebook(
+                                    research_id,
+                                    "Information Gathering",
+                                    f"### Additional Tool: {tool_name}\n**Arguments:** {json.dumps(tool_args)}\n\n**Results:**\n{tool_output}\n\n"
+                                )
+                                
+                                # Update the analysis based on the new information
+                                notebook_content = self.qm.read_file(notebook_file)  # Re-read the updated notebook
+                                analysis_prompt = self._generate_research_prompt(
+                                    command,
+                                    context=notebook_content,
+                                    stage="analysis"
+                                )
+                                analysis_output = self._call_llm(analysis_prompt)
+                            except Exception as e:
+                                analysis_output += f"\n\nError executing tool during analysis: {str(e)}"
+                        except json.JSONDecodeError:
+                            # Not valid JSON, treat as a regular analysis
+                            pass
                     
                     # Update the analysis section
                     self.update_notebook(research_id, "Analysis", analysis_output)
@@ -449,12 +529,6 @@ class ResearcherAgent:
                         command,
                         context=notebook_content + "\n\n" + analysis_output,
                         stage="synthesis"
-                    )
-                    
-                    # Ensure we identify as a Researcher Agent
-                    synthesis_prompt = synthesis_prompt.replace(
-                        "You are a Research Agent", 
-                        "You are a Researcher Agent (NOT an Analyst Agent)"
                     )
                     
                     report_draft = self._call_llm(synthesis_prompt)
@@ -483,12 +557,6 @@ class ResearcherAgent:
                         stage="continuation"
                     )
                     
-                    # Ensure we identify as a Researcher Agent
-                    research_prompt = research_prompt.replace(
-                        "You are a Research Agent", 
-                        "You are a Researcher Agent (NOT an Analyst Agent)"
-                    )
-                    
                     # Add the user's specific question or direction
                     research_prompt += f"\n\nUser's additional direction: {command}\n"
                     
@@ -502,28 +570,12 @@ class ResearcherAgent:
                             tool_name = tool_request.get("tool_to_use")
                             tool_args = tool_request.get("tool_arguments", {})
                             
-                            # Find the requested tool
-                            tool = next((t for t in self.tools if t.name == tool_name), None)
-                            if tool:
-                                # Execute the tool
-                                self.sentinel.approve_action(
-                                    agent_name="ResearcherAgent",
-                                    action_type=f"tool_use:{tool.name}",
-                                    detail=str(tool_args)
-                                )
-                                tool_output = tool.execute(**tool_args)
+                            try:
+                                # Use the helper method to execute the tool
+                                tool_output = self._execute_tool(tool_name, tool_args)
                                 
-                                # If it's a web search, add it as a source
-                                if tool_name == "internet_search":
-                                    source_info = {
-                                        "title": f"Web search for: {tool_args.get('query', 'unknown query')}",
-                                        "type": "web_search",
-                                        "summary": tool_output
-                                    }
-                                    self.add_source(research_id, source_info)
-                                
-                                # Update research with tool output
-                                info_update = f"### Tool: {tool_name}\n**Query:** {tool_args}\n\n**Results:**\n{tool_output}\n\n"
+                                # Update research notebook with tool output
+                                info_update = f"### Tool: {tool_name}\n**Arguments:** {json.dumps(tool_args)}\n\n**Results:**\n{tool_output}\n\n"
                                 
                                 # Update the information gathering section
                                 current_info = re.search(r'## Information Gathering\n\n(.*?)(?=\n## |$)', notebook_content, re.DOTALL)
@@ -542,20 +594,14 @@ class ResearcherAgent:
                                     stage="analysis"
                                 )
                                 
-                                # Ensure we identify as a Researcher Agent
-                                analysis_prompt = analysis_prompt.replace(
-                                    "You are a Research Agent", 
-                                    "You are a Researcher Agent (NOT an Analyst Agent)"
-                                )
-                                
                                 analysis_output = self._call_llm(analysis_prompt)
                                 
                                 # Update the analysis section
                                 self.update_notebook(research_id, "Analysis", analysis_output)
                                 
                                 return f"Research Update for ID {research_id}:\n\nNew Information Gathered:\n{tool_output}\n\nAnalysis:\n{analysis_output}"
-                            else:
-                                return f"Error: Tool '{tool_name}' not found. Please use one of the available tools."
+                            except Exception as e:
+                                return f"Error using tool: {str(e)}"
                         except json.JSONDecodeError:
                             # Not valid JSON, assume it's a research continuation
                             pass
@@ -597,12 +643,6 @@ class ResearcherAgent:
                             stage="synthesis"
                         )
                         
-                        # Ensure we identify as a Researcher Agent
-                        synthesis_prompt = synthesis_prompt.replace(
-                            "You are a Research Agent", 
-                            "You are a Researcher Agent (NOT an Analyst Agent)"
-                        )
-                        
                         final_report = self._call_llm(synthesis_prompt)
                         
                         # Save the final report
@@ -618,12 +658,6 @@ class ResearcherAgent:
             
             # Generate initial research plan
             research_prompt = self._generate_research_prompt(command, stage="initial")
-            
-            # Ensure we identify as a Researcher Agent
-            research_prompt = research_prompt.replace(
-                "You are a Research Agent", 
-                "You are a Researcher Agent (NOT an Analyst Agent)"
-            )
             
             plan_output = self._call_llm(research_prompt)
             

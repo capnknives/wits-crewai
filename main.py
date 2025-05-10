@@ -47,7 +47,7 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    
+
     # Load configuration
     config = {}
     config_path = args.config
@@ -107,20 +107,20 @@ def main():
         return
 
     # Initialize memory system (prefer vector memory first, then enhanced memory, then basic memory)
-try:
-    from core.vector_memory import VectorMemory
-    memory = VectorMemory(memory_file='vector_memory.json', index_file='vector_index.bin')
-    print("[SYSTEM] Using Vector Memory system")
-except Exception as e:
-    print(f"[SYSTEM] Vector Memory not available, falling back to Enhanced Memory: {e}")
     try:
-        from core.enhanced_memory import EnhancedMemory
-        memory = EnhancedMemory(memory_file='enhanced_memory.json')
-        print("[SYSTEM] Using Enhanced Memory system")
-    except Exception as e2:
-        print(f"[SYSTEM] Enhanced Memory not available, falling back to basic Memory: {e2}")
-        from core.memory import Memory
-        memory = Memory()
+        from core.vector_memory import VectorMemory
+        memory = VectorMemory(memory_file='vector_memory.json', index_file='vector_index.bin')
+        print("[SYSTEM] Using Vector Memory system")
+    except Exception as e:
+        print(f"[SYSTEM] Vector Memory not available, falling back to Enhanced Memory: {e}")
+        try:
+            from core.enhanced_memory import EnhancedMemory
+            memory = EnhancedMemory(memory_file='enhanced_memory.json')
+            print("[SYSTEM] Using Enhanced Memory system")
+        except Exception as e2:
+            print(f"[SYSTEM] Enhanced Memory not available, falling back to basic Memory: {e2}")
+            from core.memory import Memory
+            memory = Memory()
     # Initialize message bus
     message_bus = MessageBus(save_path='message_history.json')
 
@@ -205,18 +205,22 @@ except Exception as e:
     }
 
     # Initialize Planner Agent with access to other agents
+    # Also pass the message_bus_client if Planner needs to broadcast alerts
+    planner_message_client = MessageBusClient("planner", message_bus)
     planner_agent = PlannerAgent(
         config=config, memory=memory, quartermaster=quartermaster, sentinel=sentinel_agent,
-        tools=planner_tools, agents=agents
+        tools=planner_tools, agents=agents, message_bus_client=planner_message_client
     )
 
     # Add planner to the agents dictionary
     agents["planner"] = planner_agent
 
-    # Initialize message bus clients for each agent
-    message_clients = {}
-    for agent_name, agent in agents.items():
-        message_clients[agent_name] = MessageBusClient(agent_name, message_bus)
+    # Initialize message bus clients for each agent (if they need to actively use the bus)
+    # For now, only Planner explicitly takes a client for potential alerts.
+    # Other agents can be given clients if they need to send/receive messages proactively.
+    # Example:
+    # analyst_message_client = MessageBusClient("analyst", message_bus)
+    # analyst_agent.message_bus_client = analyst_message_client # If AnalystAgent is designed to use it
 
     # Set up voice input if enabled
     use_voice = config.get("voice_input", False)
@@ -242,7 +246,7 @@ except Exception as e:
     print("Available agents: Analyst, Engineer, Scribe, Researcher, Planner, Quartermaster, Sentinel")
     print("Example: 'Analyst, search for today's weather in London and create a visualization'")
     print("Example: 'Researcher, research on artificial general intelligence'")
-    print("Example: 'Planner, create plan for building a personal website'")
+    print("Example: 'Planner, create and execute plan for building a personal website'") # Updated example
     print("Say 'exit' or 'quit' to stop.\n")
 
     # Main interaction loop
@@ -269,6 +273,7 @@ except Exception as e:
 
             if user_input_text.lower() in ["exit", "quit", "bye", "shutdown"]:
                 print("Shutting down WITS CrewAI. Goodbye!")
+                message_bus.shutdown() # Shutdown message bus gracefully
                 break
 
             router_settings = config.get("router", {})
@@ -279,7 +284,7 @@ except Exception as e:
                 goal_ref = re.search(r'goal\s+(\d+)', task_content, flags=re.IGNORECASE)
                 if goal_ref:
                     goal_index = int(goal_ref.group(1))
-                    current_goals_data = memory.get_goals_list()
+                    current_goals_data = memory.get_goals_list() # Assumes Memory has get_goals_list()
                     if 1 <= goal_index <= len(current_goals_data):
                         goal_task_text = current_goals_data[goal_index - 1].get('task')
                         if goal_task_text:
@@ -290,9 +295,10 @@ except Exception as e:
             try:
                 if agent_name in agents:
                     agent = agents[agent_name]
+                    print(f"[MAIN] Dispatching to Agent: {agent_name.capitalize()}, Task: {task_content[:70]}...")
                     result_text = agent.run(task_content)
                     if result_text and isinstance(result_text, str):
-                        memory.remember_agent_output(agent_name, result_text)
+                        memory.remember_agent_output(agent_name, result_text) # Using enhanced memory method
                 else:
                     result_text = f"Agent '{agent_name}' was routed but not recognized. Check router/main.py."
 
@@ -301,18 +307,22 @@ except Exception as e:
                 result_text = f"[Blocked or Tool Error by WITS System] {se_blocked}"
             except Exception as e_agent_run:
                 print(f"[AGENT_EXECUTION_ERROR] Agent: '{agent_name}', Type: {type(e_agent_run).__name__}, Error: {e_agent_run}")
+                import traceback
+                print(traceback.format_exc())
                 result_text = f"[Agent Error - {agent_name}] An unexpected issue occurred. Please check logs or try rephrasing."
 
             print(f"\n{result_text}\n")
 
         except KeyboardInterrupt:
             print("\nKeyboard interrupt detected. Shutting down WITS CrewAI...")
+            message_bus.shutdown() # Shutdown message bus gracefully
             break
         except Exception as e_main_loop:
             print(f"\n[FATAL ERROR IN MAIN LOOP] Type: {type(e_main_loop).__name__}, Error: {e_main_loop}")
             import traceback
             print(traceback.format_exc())
             print("The AI crew encountered a critical problem and needs to shut down. Please check logs.")
+            message_bus.shutdown() # Attempt to shutdown message bus
             break
 
 
