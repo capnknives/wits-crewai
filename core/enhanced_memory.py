@@ -10,7 +10,6 @@ import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple, Union
 import re
-import time
 import uuid # For generating unique goal IDs
 
 class MemorySegment:
@@ -57,7 +56,7 @@ class MemorySegment:
             metadata=data.get("metadata", {}),
             timestamp=data.get("timestamp")
         )
-        segment.id = data["id"]
+        segment.id = data.get("id", segment._generate_id()) # Ensure ID exists or generate
         segment.importance = data.get("importance", 0.5)
         return segment
     
@@ -72,18 +71,15 @@ class EnhancedMemory:
         self.memory_file = memory_file
         self.max_segments = max_segments
         self.segments: List[MemorySegment] = []
-        # Goals will now be a list of dictionaries, each with an 'id' and 'status'
         self.goals: List[Dict[str, Any]] = [] 
         self.completed_goals: List[Dict[str, Any]] = []
-        self.agent_contexts: Dict[str, Dict[str, Any]] = {}  # Stores per-agent contextual data
+        self.agent_contexts: Dict[str, Dict[str, Any]] = {}
         self.last_output: Dict[str, str] = {}
         self.last_agent_name: Optional[str] = None
         
-        # Specialized indexes for faster retrieval
         self.segment_by_type: Dict[str, List[MemorySegment]] = {}
         self.segment_by_source: Dict[str, List[MemorySegment]] = {}
         
-        # Load existing memory if available
         self._load_memory()
 
     def _initialize_empty_memory(self):
@@ -110,13 +106,19 @@ class EnhancedMemory:
                 loaded_goals = data.get('goals', [])
                 self.goals = []
                 for g_data in loaded_goals:
-                    if not isinstance(g_data, dict): # Skip non-dict goals
+                    if not isinstance(g_data, dict):
                         print(f"[EnhancedMemory] Warning: Found non-dictionary goal item during load: {g_data}. Skipping.")
                         continue
-                    g_data.setdefault('id', str(uuid.uuid4())) # Ensure ID exists
-                    g_data.setdefault('status', 'pending') # Default status for older goals
-                    g_data.setdefault('priority', g_data.get('priority', 1)) # Ensure priority
-                    g_data.setdefault('created', g_data.get('created', datetime.now().isoformat())) # Ensure created timestamp
+                    g_data.setdefault('id', str(uuid.uuid4())) 
+                    g_data.setdefault('status', 'pending') 
+                    g_data.setdefault('priority', g_data.get('priority', 1)) 
+                    g_data.setdefault('created', g_data.get('created', datetime.now().isoformat()))
+                    g_data.setdefault('task', g_data.get('task', 'Untitled Goal'))
+                    g_data.setdefault('agent_suggestion', g_data.get('agent_suggestion', None))
+                    g_data.setdefault('deadline', g_data.get('deadline', None))
+                    g_data.setdefault('retries', g_data.get('retries', 0))
+                    g_data.setdefault('last_attempt_time', g_data.get('last_attempt_time', None))
+                    g_data.setdefault('processing_plan_id', g_data.get('processing_plan_id', None))
                     self.goals.append(g_data)
 
                 loaded_completed_goals = data.get('completed_goals', [])
@@ -126,7 +128,9 @@ class EnhancedMemory:
                         print(f"[EnhancedMemory] Warning: Found non-dictionary completed goal item: {cg_data}. Skipping.")
                         continue
                     cg_data.setdefault('id', str(uuid.uuid4()))
-                    cg_data['status'] = 'completed' # Ensure status
+                    cg_data.setdefault('status', 'completed') # Ensure status
+                    cg_data.setdefault('task', cg_data.get('task', 'Untitled Completed Goal'))
+                    cg_data.setdefault('completed_time', cg_data.get('completed_time', datetime.now().isoformat()))
                     self.completed_goals.append(cg_data)
                     
                 self.agent_contexts = data.get('agent_contexts', {})
@@ -141,11 +145,13 @@ class EnhancedMemory:
                 self._initialize_empty_memory()
             except Exception as e:
                 print(f"[EnhancedMemory] Error loading memory from {self.memory_file}: {e}. Initializing fresh memory.")
+                import traceback
+                traceback.print_exc()
                 self._initialize_empty_memory()
         else:
             print(f"[EnhancedMemory] No memory file found at {self.memory_file}, starting with empty memory.")
             self._initialize_empty_memory()
-            self._save_memory() # Create an empty memory file
+            self._save_memory() 
     
     def _save_memory(self) -> None:
         """Save memory to file, including new goal structure."""
@@ -164,7 +170,7 @@ class EnhancedMemory:
             print(f"[EnhancedMemory] Error saving memory: {e}")
     
     def _rebuild_indexes(self) -> None:
-        """Rebuild the memory segment indexes"""
+        """Rebuild the memory segment indexes for type and source."""
         self.segment_by_type = {}
         self.segment_by_source = {}
         
@@ -173,26 +179,28 @@ class EnhancedMemory:
                 self.segment_by_type[segment.segment_type] = []
             self.segment_by_type[segment.segment_type].append(segment)
             
-            if segment.source:
+            if segment.source: # Ensure source exists
                 if segment.source not in self.segment_by_source:
                     self.segment_by_source[segment.source] = []
                 self.segment_by_source[segment.source].append(segment)
     
     def add_segment(self, content: str, segment_type: str, source: str = None, 
                    metadata: Dict[str, Any] = None, importance: float = 0.5) -> str:
-        """Add a new memory segment"""
+        """Add a new memory segment."""
         metadata = metadata or {}
-        metadata['importance'] = importance
+        metadata['importance'] = importance # Ensure importance is in metadata for MemorySegment
         
         segment = MemorySegment(
             content=content,
             segment_type=segment_type,
             source=source,
-            metadata=metadata
+            metadata=metadata # Pass full metadata here
         )
+        # segment.importance is set by MemorySegment's __init__ from metadata
         
         self.segments.append(segment)
         
+        # Update indexes
         if segment.segment_type not in self.segment_by_type:
             self.segment_by_type[segment.segment_type] = []
         self.segment_by_type[segment.segment_type].append(segment)
@@ -210,17 +218,31 @@ class EnhancedMemory:
     
     def _prune_memory(self) -> None:
         """Prune memory by removing least important segments."""
-        high_importance = [s for s in self.segments if s.importance >= 0.8]
+        if len(self.segments) <= self.max_segments:
+            return
+
+        # Separate high importance segments (always keep these, e.g., active goals)
+        # For simplicity, we'll sort all and take top N, but a more nuanced approach
+        # might protect certain segment types or recent items.
+        # Current logic from user's file:
+        high_importance_segments = [s for s in self.segments if s.importance >= 0.8]
         other_segments = [s for s in self.segments if s.importance < 0.8]
         
-        to_keep_count = max(0, self.max_segments - len(high_importance))
-        
-        if len(other_segments) > to_keep_count:
-            other_segments.sort(key=lambda s: (s.importance, s.timestamp), reverse=True)
-            other_segments = other_segments[:to_keep_count]
-        
-        self.segments = high_importance + other_segments
-        self._rebuild_indexes()
+        num_to_remove_from_others = len(other_segments) - max(0, self.max_segments - len(high_importance_segments))
+
+        if num_to_remove_from_others > 0:
+            # Sort other_segments by importance (ascending) then by timestamp (oldest first) to remove
+            other_segments.sort(key=lambda s: (s.importance, s.timestamp))
+            segments_to_keep_from_others = other_segments[num_to_remove_from_others:]
+            self.segments = high_importance_segments + segments_to_keep_from_others
+        else: # Enough space, or only high importance segments
+            self.segments = high_importance_segments + other_segments
+            # Still, ensure we don't exceed max_segments if high_importance alone is too many
+            if len(self.segments) > self.max_segments:
+                self.segments.sort(key=lambda s: (s.importance, s.timestamp), reverse=True)
+                self.segments = self.segments[:self.max_segments]
+
+        self._rebuild_indexes() # Rebuild type/source indexes
         print(f"[EnhancedMemory] Pruned memory to {len(self.segments)} segments")
 
     def remember_output(self, agent_name, content): # Alias for compatibility
@@ -237,7 +259,7 @@ class EnhancedMemory:
                 content=content,
                 segment_type="agent_output",
                 source=agent_name_lower,
-                metadata={"output_type": "agent_response"},
+                metadata={"output_type": "agent_response"}, # 'importance' will be added by add_segment
                 importance=importance
             )
             # self._save_memory() # add_segment already saves
@@ -256,26 +278,23 @@ class EnhancedMemory:
     
     def add_goal(self, task_description: str, agent: Optional[str] = None, 
                 priority: int = 1, deadline: Optional[str] = None,
-                goal_id: Optional[str] = None) -> str: # Return goal_id
-        """
-        Add a new goal or task with a unique ID and status.
-        Returns the ID of the added goal.
-        """
+                goal_id: Optional[str] = None) -> str:
+        """Add a new goal or task with a unique ID and status. Returns the ID of the added goal."""
         new_goal_id = goal_id or str(uuid.uuid4())
         goal = {
             'id': new_goal_id,
             'task': task_description,
             'created': datetime.now().isoformat(),
-            'status': 'pending',  # Initial status: pending, processing, autonomous_failed, completed
-            'agent_suggestion': agent, # Agent suggestion for the planner
+            'status': 'pending',
+            'agent_suggestion': agent,
             'priority': priority,
             'deadline': deadline,
-            'retries': 0, # For autonomous processing attempts
-            'last_attempt_time': None, # Timestamp of the last autonomous attempt
-            'processing_plan_id': None # ID of the plan currently processing this goal
+            'retries': 0,
+            'last_attempt_time': None,
+            'processing_plan_id': None,
+            'result_summary': None # Initialize result_summary
         }
         
-        # Avoid adding duplicate goals if an ID is provided and already exists
         if goal_id and any(g['id'] == goal_id for g in self.goals):
             print(f"[EnhancedMemory] Goal with ID {goal_id} already exists. Not adding again.")
             return goal_id
@@ -285,7 +304,7 @@ class EnhancedMemory:
         self.add_segment(
             content=f"PENDING GOAL (ID: {new_goal_id}): {task_description}",
             segment_type="goal_pending",
-            source=agent or "System", # Use 'agent' if provided, else 'System'
+            source=agent or "System",
             metadata={
                 "goal_id": new_goal_id,
                 "priority": priority,
@@ -302,10 +321,7 @@ class EnhancedMemory:
     def update_goal_status(self, goal_id: str, new_status: str, 
                            processing_plan_id: Optional[str] = None, 
                            result_summary: Optional[str] = None) -> bool:
-        """
-        Update the status of a goal.
-        Valid statuses: pending, processing, autonomous_failed, completed, manual_override.
-        """
+        """Update the status of a goal."""
         for goal in self.goals:
             if goal.get('id') == goal_id:
                 goal['status'] = new_status
@@ -316,45 +332,39 @@ class EnhancedMemory:
                 elif new_status == 'autonomous_failed':
                     goal['retries'] = goal.get('retries', 0) + 1
                     goal['last_attempt_time'] = datetime.now().isoformat()
-                    goal['processing_plan_id'] = None # Clear plan ID on failure
-                elif new_status == 'pending': # Resetting to pending
+                    goal['processing_plan_id'] = None 
+                elif new_status == 'pending': 
                     goal['processing_plan_id'] = None
-                    # Optionally reset retries if you want it to be picked up fresh
-                    # goal['retries'] = 0 
-                if result_summary:
+                if result_summary: # Update or set result summary
                     goal['result_summary'] = result_summary
                 
                 self._save_memory()
                 print(f"[EnhancedMemory] Updated Goal ID {goal_id} to status: {new_status}")
                 return True
         
-        # If trying to update a completed goal (e.g., add a result summary later)
-        for goal in self.completed_goals:
+        for goal in self.completed_goals: # Check completed goals too for updates like adding a result summary
             if goal.get('id') == goal_id:
-                if new_status == 'completed': # Reaffirm or update details
-                    goal['status'] = 'completed'
+                if new_status == 'completed': 
+                    goal['status'] = 'completed' # Reaffirm
                     goal['updated_time'] = datetime.now().isoformat()
-                    if result_summary and not goal.get('result_summary'): # Only add if not already set
+                    if result_summary and not goal.get('result_summary'): # Add if not already set
                         goal['result_summary'] = result_summary
                     self._save_memory()
                     print(f"[EnhancedMemory] Updated details for completed Goal ID {goal_id}.")
                     return True
                 else:
-                    print(f"[EnhancedMemory] Cannot change status of already completed Goal ID {goal_id} to '{new_status}'.")
+                    print(f"[EnhancedMemory] Cannot change status of already completed Goal ID {goal_id} to '{new_status}'. Only result_summary can be added.")
                     return False
 
-        print(f"[EnhancedMemory] Update failed: Goal ID {goal_id} not found in active goals.")
+        print(f"[EnhancedMemory] Update failed: Goal ID {goal_id} not found in active or completed goals.")
         return False
 
     def get_pending_goals(self) -> List[Dict[str, Any]]:
         """Returns a list of goals with 'pending' status, suitable for autonomous processing."""
-        # Filter for goals that are 'pending' AND not currently associated with an active plan
-        # (or add more sophisticated logic like retry counts, backoff periods for 'autonomous_failed')
         pending_for_pickup = [
             g for g in self.goals 
             if g.get('status') == 'pending' and not g.get('processing_plan_id')
         ]
-        # Sort by priority (desc), then by creation date (asc)
         pending_for_pickup.sort(key=lambda g: (-g.get('priority', 1), g.get('created', '')))
         return pending_for_pickup
     
@@ -363,47 +373,57 @@ class EnhancedMemory:
         goal_to_complete = None
         index_to_pop = -1
 
-        # Prioritize finding by ID
-        if isinstance(goal_id_or_task_desc, str):
+        # Try to find by ID first
+        if isinstance(goal_id_or_task_desc, str): # Could be ID or task description
             for i, g in enumerate(self.goals):
                 if g.get('id') == goal_id_or_task_desc:
                     goal_to_complete = g
                     index_to_pop = i
                     break
         
-        # Fallback to index (if int) or task description (if str and not an ID)
-        if not goal_to_complete:
-            if isinstance(goal_id_or_task_desc, int):
-                user_index = goal_id_or_task_desc - 1 # Assuming 1-based index from user
-                # This is tricky because the list order can change. Best to get ID from UI/user.
-                # For now, we'll assume the user is referring to the current `self.goals` list order.
-                # A safer way would be for the UI to pass the ID.
-                if 0 <= user_index < len(self.goals):
-                    goal_to_complete = self.goals[user_index]
-                    index_to_pop = user_index
-            elif isinstance(goal_id_or_task_desc, str): # Match by task description as last resort
-                for i, g in enumerate(self.goals):
-                    if goal_id_or_task_desc.lower() in g.get('task', '').lower():
-                        goal_to_complete = g
+        # If not found by ID and it's an int, try by displayed index (less reliable)
+        if not goal_to_complete and isinstance(goal_id_or_task_desc, int):
+            # This assumes the list_goals() display order. For UI, passing ID is better.
+            # For CLI, if user says "complete goal 1", it refers to the displayed list.
+            # We need a way to map this displayed index back to an ID or actual list index.
+            # Let's sort self.goals as list_goals does, then use the index.
+            temp_sorted_goals = sorted(self.goals, key=lambda g_sort: (-g_sort.get('priority', 1), g_sort.get('created', '')))
+            user_index = goal_id_or_task_desc - 1 
+            if 0 <= user_index < len(temp_sorted_goals):
+                goal_to_find_in_main_list = temp_sorted_goals[user_index]
+                for i, g_main in enumerate(self.goals):
+                    if g_main.get('id') == goal_to_find_in_main_list.get('id'):
+                        goal_to_complete = g_main
                         index_to_pop = i
-                        print(f"[EnhancedMemory] Warning: Matched goal for completion by task description '{goal_id_or_task_desc}'. Using Goal ID is preferred.")
                         break
+                if goal_to_complete:
+                    print(f"[EnhancedMemory] Matched goal for completion by displayed index {goal_id_or_task_desc} (ID: {goal_to_complete.get('id')}).")
+
+
+        # Fallback to task description match if still not found and input was string
+        if not goal_to_complete and isinstance(goal_id_or_task_desc, str):
+            for i, g in enumerate(self.goals):
+                if goal_id_or_task_desc.lower() in g.get('task', '').lower():
+                    goal_to_complete = g
+                    index_to_pop = i
+                    print(f"[EnhancedMemory] Warning: Matched goal for completion by task description '{goal_id_or_task_desc}'. Using Goal ID is preferred.")
+                    break
         
         if goal_to_complete and index_to_pop != -1:
             completed_goal_entry = self.goals.pop(index_to_pop)
             completed_goal_entry['status'] = 'completed'
             completed_goal_entry['completed_time'] = datetime.now().isoformat()
             completed_goal_entry['updated_time'] = completed_goal_entry['completed_time']
-            if result:
-                completed_goal_entry['result'] = result # Store the main result
+            if result: # Store the main result/summary
+                completed_goal_entry['result_summary'] = result # Changed from 'result' to 'result_summary'
             
             self.completed_goals.append(completed_goal_entry)
             
             self.add_segment(
-                content=f"COMPLETED GOAL (ID: {completed_goal_entry['id']}): {completed_goal_entry['task']}" + (f"\nResult: {result}" if result else ""),
+                content=f"COMPLETED GOAL (ID: {completed_goal_entry['id']}): {completed_goal_entry['task']}" + (f"\nResult Summary: {result}" if result else ""),
                 segment_type="goal_completed",
                 source=completed_goal_entry.get('agent_suggestion') or "System",
-                metadata={key: val for key, val in completed_goal_entry.items() if key not in ['task']},
+                metadata={key: val for key, val in completed_goal_entry.items() if key not in ['task', 'content']}, # Avoid duplicating task in content and metadata
                 importance=0.85 
             )
             self._save_memory()
@@ -411,6 +431,58 @@ class EnhancedMemory:
             return True
             
         print(f"[EnhancedMemory] Could not complete goal: '{goal_id_or_task_desc}' not found or not a valid identifier in active goals.")
+        return False
+
+    def delete_goal_permanently(self, goal_id: str) -> bool:
+        """
+        Permanently deletes a goal from active and completed lists, and its related memory segments.
+        """
+        goal_found_and_deleted = False
+        original_task_desc = None
+
+        # Try to delete from active goals
+        for i, goal in enumerate(self.goals):
+            if goal.get('id') == goal_id:
+                original_task_desc = goal.get('task', 'Unknown task')
+                del self.goals[i]
+                goal_found_and_deleted = True
+                print(f"[EnhancedMemory] Deleted active goal ID {goal_id}: '{original_task_desc}'")
+                break
+        
+        # Try to delete from completed goals if not found in active
+        if not goal_found_and_deleted:
+            for i, goal in enumerate(self.completed_goals):
+                if goal.get('id') == goal_id:
+                    original_task_desc = goal.get('task', 'Unknown task')
+                    del self.completed_goals[i]
+                    goal_found_and_deleted = True
+                    print(f"[EnhancedMemory] Deleted completed goal ID {goal_id}: '{original_task_desc}'")
+                    break
+        
+        if goal_found_and_deleted:
+            # Remove related memory segments
+            segments_to_keep = []
+            deleted_segment_count = 0
+            for segment in self.segments:
+                # Check if segment's metadata links it to the deleted goal
+                if segment.metadata.get('goal_id') == goal_id:
+                    print(f"[EnhancedMemory] Deleting segment ID {segment.id} related to goal ID {goal_id}")
+                    deleted_segment_count += 1
+                # Also check if content indicates it's the primary goal_pending/completed segment
+                elif segment.segment_type in ["goal_pending", "goal_completed"] and f"(ID: {goal_id})" in segment.content:
+                    print(f"[EnhancedMemory] Deleting primary segment ID {segment.id} for goal ID {goal_id}")
+                    deleted_segment_count += 1
+                else:
+                    segments_to_keep.append(segment)
+            
+            if deleted_segment_count > 0:
+                self.segments = segments_to_keep
+                self._rebuild_indexes() # Rebuild if segments were removed
+
+            self._save_memory()
+            return True
+        
+        print(f"[EnhancedMemory] Permanent delete failed: Goal ID {goal_id} not found.")
         return False
 
     def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
@@ -428,23 +500,22 @@ class EnhancedMemory:
         if not self.goals:
             return "No current goals."
         
-        display_goals = self.goals
+        display_goals = list(self.goals) # Create a copy for filtering
         
         if status_filter:
-            display_goals = [g for g in display_goals if g.get('status', 'pending') == status_filter]
-        if agent: # Filter by agent_suggestion
+            display_goals = [g for g in display_goals if g.get('status', 'pending').lower() == status_filter.lower()]
+        if agent: 
             display_goals = [g for g in display_goals if g.get('agent_suggestion', '').lower() == agent.lower()]
-        if priority:
+        if priority is not None: # Allow priority 0
             display_goals = [g for g in display_goals if g.get('priority', 1) == priority]
         
         if not display_goals:
             return "No goals matching the specified filters."
             
-        # Sort by priority (desc), then by creation date (asc)
         display_goals.sort(key=lambda g: (-g.get('priority', 1), g.get('created', '')))
         
         output_lines = ["Current Goals:"]
-        for i, g in enumerate(display_goals): # User-friendly 1-based index for display
+        for i, g in enumerate(display_goals):
             goal_id_str = g.get('id', 'N/A')
             priority_str = f"[Prio: {g.get('priority', 1)}]"
             agent_sugg_str = f"[Suggest: {g.get('agent_suggestion', 'Any')}]"
@@ -458,7 +529,7 @@ class EnhancedMemory:
             )
         return "\n".join(output_lines)
     
-    def get_goals_list(self): # This is used by main.py
+    def get_goals_list(self): # This is used by main.py and app.py
         """Returns the raw list of active goal dictionaries."""
         return self.goals
     
@@ -467,6 +538,7 @@ class EnhancedMemory:
         if not self.completed_goals:
             return "No completed goals yet."
         
+        # Sort by completion time, most recent first
         sorted_completed = sorted(self.completed_goals, key=lambda g: g.get('completed_time', ''), reverse=True)
         if limit > 0:
             sorted_completed = sorted_completed[:limit]
@@ -474,15 +546,15 @@ class EnhancedMemory:
         output_lines = ["Recently Completed Goals:"]
         for i, g in enumerate(sorted_completed):
             goal_id_str = g.get('id', 'N/A')
-            agent_sugg_str = f"[Suggest: {g.get('agent_suggestion', 'Any')}]" # Show original suggestion
+            agent_sugg_str = f"[Original Suggest: {g.get('agent_suggestion', 'Any')}]"
             completed_time_str = g.get('completed_time', 'N/A')
-            result_str = g.get('result', '')
-            result_preview = result_str[:50] + ("..." if len(result_str) > 50 else "")
+            result_summary = g.get('result_summary', '') # Changed from 'result'
+            result_preview = result_summary[:50] + ("..." if len(result_summary) > 50 else "")
             
             output_lines.append(
                 f"{i+1}. ID: {goal_id_str[:8]}... {agent_sugg_str} Task: {g.get('task', '')} "
-                f"(Completed: {completed_time_str})" + (f" Result: {result_preview}" if result_str else "") +
-                f" [Status: {g.get('status', 'completed')}]" # Should always be 'completed' here
+                f"(Completed: {completed_time_str})" + (f" Result: {result_preview}" if result_summary else "") +
+                f" [Status: {g.get('status', 'completed')}]"
             )
         return "\n".join(output_lines)
     
@@ -501,8 +573,8 @@ class EnhancedMemory:
     
     def search_memory(self, query: str, segment_type: Optional[str] = None, 
                      source: Optional[str] = None, limit: int = 10) -> List[MemorySegment]:
-        """Search memory segments by content."""
-        candidates = list(self.segments) # Work on a copy for filtering
+        """Search memory segments by content (simple keyword match)."""
+        candidates = list(self.segments)
         
         if segment_type:
             candidates = [s for s in candidates if s.segment_type == segment_type]
@@ -512,16 +584,16 @@ class EnhancedMemory:
         results = []
         query_lower = query.lower()
         for segment in candidates:
-            if query_lower in segment.content.lower(): # Simple substring match
+            if query_lower in segment.content.lower():
                 results.append(segment)
         
-        # Sort by timestamp (most recent first) as a simple relevance proxy if no other scoring
-        results.sort(key=lambda s: s.timestamp, reverse=True)
+        results.sort(key=lambda s: (s.importance, s.timestamp), reverse=True) # Sort by importance then recency
         return results[:limit]
     
     def get_recent_memory(self, segment_type: Optional[str] = None, 
                          source: Optional[str] = None, limit: int = 10) -> List[MemorySegment]:
-        """Get recent memory segments."""
+        """Get recent memory segments, optionally filtered."""
+        # This method from user's file is good.
         candidates = list(self.segments)
         if segment_type:
             candidates = [s for s in candidates if s.segment_type == segment_type]
@@ -539,13 +611,15 @@ class EnhancedMemory:
         return None
     
     def delete_segment(self, segment_id: str) -> bool:
-        """Delete a memory segment."""
+        """Delete a memory segment by its ID."""
         original_len = len(self.segments)
         self.segments = [s for s in self.segments if s.id != segment_id]
         if len(self.segments) < original_len:
-            self._rebuild_indexes() # Rebuild if a segment was actually removed
+            self._rebuild_indexes() 
             self._save_memory()
+            print(f"[EnhancedMemory] Deleted segment ID {segment_id}.")
             return True
+        print(f"[EnhancedMemory] Segment ID {segment_id} not found for deletion.")
         return False
     
     def update_segment(self, segment_id: str, content: Optional[str] = None, 
@@ -556,21 +630,27 @@ class EnhancedMemory:
         if not segment:
             return False
         
-        if content is not None:
+        changed = False
+        if content is not None and segment.content != content:
             segment.content = content
+            changed = True
         if metadata is not None:
             segment.metadata.update(metadata)
-        if importance is not None:
+            changed = True # Assume metadata change is significant
+        if importance is not None and segment.importance != importance:
             segment.importance = importance
-            if 'importance' in segment.metadata: # Also update metadata if it was there
-                 segment.metadata['importance'] = importance
+            segment.metadata['importance'] = importance 
+            changed = True
         
-        self._save_memory()
+        if changed:
+            segment.timestamp = datetime.now().isoformat() # Update timestamp on any change
+            self._save_memory()
         return True
     
     def get_memory_summary(self, segment_type: Optional[str] = None, 
                           source: Optional[str] = None, limit: int = 5) -> str:
         """Generate a summary of recent memory segments."""
+        # This method from user's file is good.
         recent_segments = self.get_recent_memory(segment_type, source, limit)
         if not recent_segments:
             return "No relevant memory segments found."
@@ -588,10 +668,11 @@ class EnhancedMemory:
     
     def get_related_memories(self, query: str, limit: int = 5) -> List[MemorySegment]:
         """Find memories related to a query using keyword matching and importance."""
+        # This method from user's file is good.
         stopwords = {"the", "a", "an", "of", "to", "in", "for", "on", "with", "by", "at", "from", "is", "are", "was", "were"}
         query_keywords = {word.lower() for word in re.findall(r'\w+', query) if word.lower() not in stopwords and len(word) > 2}
         
-        if not query_keywords:
+        if not query_keywords: # If query is all stopwords or too short, return recent
             return self.get_recent_memory(limit=limit)
         
         scored_segments = []
@@ -601,14 +682,12 @@ class EnhancedMemory:
             segment_words = {word.lower() for word in re.findall(r'\w+', content_lower) if word.lower() not in stopwords}
             
             common_keywords = query_keywords.intersection(segment_words)
-            score += len(common_keywords) * 2 # Higher weight for direct keyword match
+            score += len(common_keywords) * 2 
             
-            # Bonus for query being a substring
-            if query.lower() in content_lower:
+            if query.lower() in content_lower: # Bonus for query being a substring
                 score += 3
 
-            # Consider importance
-            score *= (0.5 + segment.importance) # Scale score by importance (0.5 to 1.5 factor)
+            score *= (0.5 + segment.importance) # Scale score by importance
             
             if score > 0:
                 scored_segments.append((segment, score))
@@ -618,7 +697,6 @@ class EnhancedMemory:
     
     def flush(self) -> str:
         """Clear all memory, returning a confirmation message"""
-        self._initialize_empty_memory() # Use the helper
+        self._initialize_empty_memory()
         self._save_memory()
         return "[EnhancedMemory] All memory wiped."
-
