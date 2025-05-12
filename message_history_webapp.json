@@ -1,0 +1,54 @@
+[
+  {
+    "id": "msg_20250512121824508366",
+    "sender": "planner_webapp",
+    "recipient": "all",
+    "content": "Plan 'Research Gold Price and Save to File' has completed!",
+    "message_type": "broadcast",
+    "context": "plan_completion:plan_20230314_153048_short_goal_summary",
+    "metadata": {},
+    "timestamp": "2025-05-12T12:18:24.508366",
+    "read": false,
+    "replied_to": false,
+    "parent_id": null
+  },
+  {
+    "id": "msg_20250512123153712177",
+    "sender": "planner_webapp",
+    "recipient": "all",
+    "content": "Plan 'Research Gold Price and Save News Flash' has completed!",
+    "message_type": "broadcast",
+    "context": "plan_completion:plan_20230314_143537_short_goal_summary",
+    "metadata": {},
+    "timestamp": "2025-05-12T12:31:53.712177",
+    "read": false,
+    "replied_to": false,
+    "parent_id": null
+  },
+  {
+    "id": "msg_20250512124029377648",
+    "sender": "planner_webapp",
+    "recipient": "all",
+    "content": "Plan 'Short Goal Summary: Research Gold Price and Save to File' has completed!",
+    "message_type": "broadcast",
+    "context": "plan_completion:plan_20230314_153035_short_goal_summary",
+    "metadata": {},
+    "timestamp": "2025-05-12T12:40:29.377648",
+    "read": false,
+    "replied_to": false,
+    "parent_id": null
+  },
+  {
+    "id": "msg_20250512124847473793",
+    "sender": "planner_webapp",
+    "recipient": "all",
+    "content": "Plan 'Research Gold Price and Save to File' has completed!",
+    "message_type": "broadcast",
+    "context": "plan_completion:plan_20230314_153030_short_goal_summary",
+    "metadata": {},
+    "timestamp": "2025-05-12T12:48:47.473793",
+    "read": false,
+    "replied_to": false,
+    "parent_id": null
+  }
+]
