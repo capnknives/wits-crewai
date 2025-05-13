@@ -15,13 +15,14 @@ whisper_fp16: false          # Whether to use half-precision (FP16) for Whisper 
 # Model selection for each agent (Ollama model names)
 # Ensure these models are pulled and available in your Ollama instance.
 models:
-  default: llama2             # Default LLM for general tasks or if a specific agent model isn't listed
-  scribe: llama2              # Model for the ScribeAgent (content creation)
-  analyst: llama2             # Model for the AnalystAgent (research, summarization)
-  engineer: codellama:7b      # Use a code-specialized model for the EngineerAgent (e.g., codellama, deepseek-coder)
-  researcher: llama2          # Model for the ResearcherAgent (in-depth research and synthesis)
-  planner: llama2             # Model for the PlannerAgent (task planning and coordination)
+  default: llama3:latest        # Or openhermes:latest
+  scribe: llama3:latest         # Test wits:latest if it's for creative writing
+  analyst: openhermes:latest    # Or llama3:latest; test wits:latest
+  engineer: codellama:7b
+  researcher: llama3:latest     # Or openhermes:latest; test wits:latest
+  planner: openhermes:latest    # Or llama3:latest; test wits:latest
 
+  
 # Router settings
 router:
   fallback_agent: analyst     # Default agent to use when no specific agent is identified in command
